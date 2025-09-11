@@ -48,7 +48,7 @@ public class PhotonConnector : MonoBehaviourPunCallbacks, IConnectionService
             DontDestroyOnLoad(gameObject);
         }
     }
-
+    
     public void Connect(string nickName)
     {
         if (PhotonNetwork.IsConnected)
@@ -61,6 +61,7 @@ public class PhotonConnector : MonoBehaviourPunCallbacks, IConnectionService
         PhotonNetwork.ConnectUsingSettings();
         Debug.Log($"[PhotonConnector] Connecting as {PhotonNetwork.NickName}...");
     }
+    
 
     public override void OnConnectedToMaster()
     {
