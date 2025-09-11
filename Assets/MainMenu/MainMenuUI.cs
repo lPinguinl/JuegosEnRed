@@ -10,7 +10,7 @@ public class MainMenuUI : MonoBehaviour
 
     private PhotonConnector connector;
 
-    private void Awake()
+    private void Start()
     {
         connector = PhotonConnector.Instance;
         if (connector == null)
@@ -50,7 +50,7 @@ public class MainMenuUI : MonoBehaviour
         Debug.Log($"[MainMenuUI] Connecting as {nameInput.text.Trim()}...");
     }
 
-    private void OnJoinedLobby()
+    private void  OnJoinedLobby()
     {
         Debug.Log("[MainMenuUI] Successfully joined lobby. Loading Lobby scene...");
         SceneManager.LoadScene("Lobby");

@@ -29,6 +29,14 @@ public class LobbyManager : MonoBehaviourPunCallbacks
             // Solo el Master Client puede ver y usar este botón
             startButton.gameObject.SetActive(PhotonNetwork.IsMasterClient);
         }
+        
+        Debug.Log($"[LobbyManager] Is Master Client: {PhotonNetwork.IsMasterClient}");
+
+        if (startButton != null)
+        {
+            startButton.onClick.AddListener(OnStartClicked);
+            startButton.gameObject.SetActive(PhotonNetwork.IsMasterClient);
+        }
     }
 
     private void OnDestroy()

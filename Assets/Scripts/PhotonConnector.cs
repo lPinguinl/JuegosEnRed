@@ -5,7 +5,27 @@ using Photon.Realtime;
 
 public class PhotonConnector : MonoBehaviourPunCallbacks, IConnectionService
 {
-    public static PhotonConnector Instance { get; private set; }
+    private static PhotonConnector _instance;
+    public static PhotonConnector Instance 
+    {
+        get
+        {
+            if (_instance == null)
+            {
+                // Busca la instancia en la escena
+                _instance = FindObjectOfType<PhotonConnector>();
+
+                // Si no se encuentra, crea un nuevo objeto
+                if (_instance == null)
+                {
+                    GameObject singletonObject = new GameObject();
+                    _instance = singletonObject.AddComponent<PhotonConnector>();
+                    singletonObject.name = typeof(PhotonConnector).ToString() + " (Singleton)";
+                }
+            }
+            return _instance;
+        }
+    }
 
     public event Action ConnectedToMaster;
     public event Action JoinedLobby;
@@ -16,8 +36,17 @@ public class PhotonConnector : MonoBehaviourPunCallbacks, IConnectionService
 
     private void Awake()
     {
-        if (Instance == null) { Instance = this; DontDestroyOnLoad(gameObject); }
-        else { Destroy(gameObject); return; }
+        if (_instance != null && _instance != this)
+        {
+            // Si ya existe otra instancia, destrúyela para evitar duplicados.
+            Destroy(gameObject);
+        }
+        else
+        {
+            // Asigna la instancia actual y asegúrate de que persista.
+            _instance = this;
+            DontDestroyOnLoad(gameObject);
+        }
     }
 
     public void Connect(string nickName)
@@ -60,7 +89,6 @@ public class PhotonConnector : MonoBehaviourPunCallbacks, IConnectionService
         Disconnected?.Invoke();
     }
 
-    // Simple helper used in LobbyManager to join or create a room
     public void JoinRandomOrCreateRoom(byte maxPlayers = 4)
     {
         PhotonNetwork.JoinRandomRoom();
