@@ -1,17 +1,29 @@
 using UnityEngine;
 using TMPro;
 using Photon.Realtime;
-using ExitGames.Client.Photon;
 
 public class PlayerListItem : MonoBehaviour
 {
-    [SerializeField] private TMP_Text nameText;
-    [SerializeField] private TMP_Text readyText;
+    [SerializeField] private TMP_Text playerNameText;
+    [SerializeField] private TMP_Text readyStatusText;
 
-    public void Setup(Player p)
+    private Player player;
+
+    public void SetPlayerInfo(Player player)
     {
-        nameText.text = p.NickName;
-        bool ready = p.CustomProperties.ContainsKey("isReady") && (bool)p.CustomProperties["isReady"];
-        readyText.text = ready ? "Ready" : "Not Ready";
+        this.player = player;
+        UpdateInfo();
     }
+
+    public void UpdateInfo()
+    {
+        if (playerNameText != null)
+            playerNameText.text = player.NickName;
+
+        bool isReady = player.CustomProperties.ContainsKey("isReady") && (bool)player.CustomProperties["isReady"];
+        if (readyStatusText != null)
+            readyStatusText.text = isReady ? "✅ Ready" : "⏳ Not Ready";
+    }
+
+    public Player GetPlayer() => player;
 }
