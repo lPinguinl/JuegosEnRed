@@ -1,36 +1,38 @@
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.SceneManagement;
 using Photon.Pun;
 using Photon.Realtime;
-using ExitGames.Client.Photon;
-using System.Linq;
+using TMPro;
 
 public class LobbyManager : MonoBehaviourPunCallbacks
 {
     [SerializeField] private Button readyButton;
 
     private bool isPlayerReady = false;
-    private bool gameStarted = false;
+    private TMP_Text readyButtonLabel;
 
     private void Start()
     {
         if (readyButton != null)
+        {
             readyButton.onClick.AddListener(OnReadyClicked);
-    }
-
-    private void OnDestroy()
-    {
-        if (readyButton != null)
-            readyButton.onClick.RemoveListener(OnReadyClicked);
+            readyButtonLabel = readyButton.GetComponentInChildren<TMP_Text>();
+            if (readyButtonLabel == null)
+                Debug.LogError("[LobbyManager] No TMP_Text found inside Ready Button.");
+        }
+        else
+        {
+            Debug.LogError("[LobbyManager] Ready Button not assigned in inspector.");
+        }
     }
 
     private void OnReadyClicked()
     {
         isPlayerReady = !isPlayerReady;
 
-        if (readyButton != null)
-            readyButton.GetComponentInChildren<Text>().text = isPlayerReady ? "Unready" : "Ready";
+        // Actualiza el texto usando TMP_Text
+        if (readyButtonLabel != null)
+            readyButtonLabel.text = isPlayerReady ? "Unready" : "Ready";
 
         SetPlayerReadyState(isPlayerReady);
         CheckAndStartGame();
@@ -38,28 +40,27 @@ public class LobbyManager : MonoBehaviourPunCallbacks
 
     private void SetPlayerReadyState(bool ready)
     {
-        Hashtable playerProps = new Hashtable { { "isReady", ready } };
+        ExitGames.Client.Photon.Hashtable playerProps = new ExitGames.Client.Photon.Hashtable
+        {
+            ["isReady"] = ready
+        };
         PhotonNetwork.LocalPlayer.SetCustomProperties(playerProps);
     }
 
     private void CheckAndStartGame()
     {
-        if (gameStarted) return; // Previene doble carga de escena
-
-        // ✅ Ahora no depende del MasterClient
-        bool allReady = PhotonNetwork.PlayerList.All(p =>
-            p.CustomProperties.ContainsKey("isReady") &&
-            (bool)p.CustomProperties["isReady"]);
-
-        if (allReady && PhotonNetwork.CurrentRoom.PlayerCount > 0)
+        foreach (Player p in PhotonNetwork.PlayerList)
         {
-            gameStarted = true;
-            PhotonNetwork.IsMessageQueueRunning = false; // Evita duplicados
-            PhotonNetwork.LoadLevel("GameScene");
+            if (!p.CustomProperties.ContainsKey("isReady") || !(bool)p.CustomProperties["isReady"])
+                return;
         }
+
+        //Todos están listos → inicia la partida
+        //No cerramos la sala, por lo que nuevos jugadores aún pueden entrar si llegan tarde.
+        PhotonNetwork.LoadLevel("GameScene");
     }
 
-    public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
+    public override void OnPlayerPropertiesUpdate(Player targetPlayer, ExitGames.Client.Photon.Hashtable changedProps)
     {
         if (changedProps.ContainsKey("isReady"))
             CheckAndStartGame();
