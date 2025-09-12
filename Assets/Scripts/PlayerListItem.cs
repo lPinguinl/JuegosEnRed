@@ -19,10 +19,10 @@ public class PlayerListItem : MonoBehaviour
     {
         if (playerNameText != null)
             playerNameText.text = player.NickName;
-
+            
         bool isReady = player.CustomProperties.ContainsKey("isReady") && (bool)player.CustomProperties["isReady"];
         if (readyStatusText != null)
-            readyStatusText.text = isReady ? "✅ Ready" : "⏳ Not Ready";
+            readyStatusText.text = isReady ? "Ready" : "Not Ready";
     }
 
     public Player GetPlayer() => player;
