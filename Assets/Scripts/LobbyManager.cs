@@ -64,7 +64,10 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     
     private void CheckAndStartGame()
     {
+        // Obtiene el número total de jugadores en la sala
+        int playerCount = PhotonNetwork.CurrentRoom.PlayerCount;
         int readyCount = 0;
+    
         foreach (Player p in PhotonNetwork.PlayerList)
         {
             if (p.CustomProperties.ContainsKey("isReady") && (bool)p.CustomProperties["isReady"])
@@ -72,10 +75,23 @@ public class LobbyManager : MonoBehaviourPunCallbacks
                 readyCount++;
             }
         }
-        
-        if (readyCount > 0)
+    
+        // Si hay más de un jugador, todos deben estar listos
+        if (playerCount >= 2)
         {
-            PhotonNetwork.LoadLevel("GameScene");
+            if (readyCount == playerCount)
+            {
+                // Todos están listos, se inicia la partida
+                PhotonNetwork.LoadLevel("GameScene");
+            }
+        }
+        // Si solo hay un jugador, el juego puede empezar cuando él ponga "Ready"
+        else if (playerCount == 1)
+        {
+            if (readyCount == 1)
+            {
+                PhotonNetwork.LoadLevel("GameScene");
+            }
         }
     }
 
