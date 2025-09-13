@@ -174,7 +174,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   moveSpeed: 5
   jumpForce: 4
-  groundCheckDistance: 0.5
+  groundCheckDistance: 1
 --- !u!114 &674708247443687902
 MonoBehaviour:
   m_ObjectHideFlags: 0
