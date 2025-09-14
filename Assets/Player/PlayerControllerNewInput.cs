@@ -1,13 +1,14 @@
 using UnityEngine;
 using Photon.Pun;
+using System.Collections;
 using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(Rigidbody))]
-public class PlayerControllerNewInput : MonoBehaviourPun, IPunObservable
+public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObservable
 {
     [SerializeField] private float moveSpeed = 5f;
     [SerializeField] private float jumpForce = 5f;
-    [SerializeField] private float groundCheckDistance = 0.2f; // Distancia para raycast al suelo
+    [SerializeField] private float groundCheckDistance = 0.2f;
 
     private Rigidbody rb;
     private PlayerControls controls;
@@ -16,7 +17,9 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IPunObservable
     private Vector3 networkPosition;
     private Quaternion networkRotation;
 
-    private bool isGrounded = false; // Se inicializa en false para evitar saltos indeseados al inicio.
+    private bool isGrounded = false;
+    private bool canMove = true;
+    private bool isStunned = false;
 
     private void Awake()
     {
@@ -27,12 +30,8 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IPunObservable
     private void OnEnable()
     {
         controls.Player.Enable();
-
-        // Movimiento
         controls.Player.Move.performed += ctx => { if (photonView.IsMine) moveInput = ctx.ReadValue<Vector2>(); };
         controls.Player.Move.canceled += ctx => { if (photonView.IsMine) moveInput = Vector2.zero; };
-
-        // Salto
         controls.Player.Jump.performed += ctx => { if (photonView.IsMine) TryJump(); };
     }
 
@@ -55,7 +54,6 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IPunObservable
             Camera cam = GetComponentInChildren<Camera>(true);
             if (cam) cam.enabled = false;
         }
-
         networkPosition = transform.position;
         networkRotation = transform.rotation;
     }
@@ -65,17 +63,18 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IPunObservable
         if (photonView.IsMine)
         {
             GroundCheck();
-
-            Vector3 move = new Vector3(moveInput.x, 0f, moveInput.y);
-            if (move.magnitude > 1f) move.Normalize();
-
-            Vector3 targetPos = rb.position + move * moveSpeed * Time.fixedDeltaTime;
-            rb.MovePosition(targetPos);
-
-            if (move.sqrMagnitude > 0.001f)
+            if (canMove)
             {
-                Quaternion targetRot = Quaternion.LookRotation(move);
-                rb.MoveRotation(Quaternion.Slerp(rb.rotation, targetRot, 10f * Time.fixedDeltaTime));
+                Vector3 move = new Vector3(moveInput.x, 0f, moveInput.y);
+                if (move.magnitude > 1f) move.Normalize();
+                Vector3 targetPos = rb.position + move * moveSpeed * Time.fixedDeltaTime;
+                rb.MovePosition(targetPos);
+
+                if (move.sqrMagnitude > 0.001f)
+                {
+                    Quaternion targetRot = Quaternion.LookRotation(move);
+                    rb.MoveRotation(Quaternion.Slerp(rb.rotation, targetRot, 10f * Time.fixedDeltaTime));
+                }
             }
         }
         else
@@ -87,7 +86,7 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IPunObservable
 
     private void TryJump()
     {
-        if (isGrounded)
+        if (isGrounded && canMove)
         {
             rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
         }
@@ -95,11 +94,9 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IPunObservable
 
     private void GroundCheck()
     {
-        // Se lanza el rayo desde los pies del personaje.
         Vector3 rayOrigin = transform.position + Vector3.down * 0.45f;
         Ray ray = new Ray(rayOrigin, Vector3.down);
 
-        // Se ajusta la distancia para que solo detecte el suelo cuando está muy cerca.
         if (Physics.Raycast(ray, out RaycastHit hit, groundCheckDistance))
         {
             var walkable = hit.collider.GetComponent<IWalkableSurface>();
@@ -117,6 +114,44 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IPunObservable
             isGrounded = false;
         }
     }
+    
+    // Método de la interfaz IStunable (Ahora llamado por el RPC)
+    public void Stun(Vector3 attackerPosition)
+    {
+        // No necesitamos código aquí porque la lógica está en el RPC
+    }
+
+    [PunRPC]
+    private void RPC_OnStunned(Vector3 attackerPosition)
+    {
+        if (isStunned) return; // Evita stuns repetidos en la misma máquina
+
+        isStunned = true;
+        StartCoroutine(StunCoroutine(attackerPosition));
+    }
+
+    private IEnumerator StunCoroutine(Vector3 attackerPosition)
+    {
+        canMove = false;
+        rb.constraints = RigidbodyConstraints.None;
+        
+        Vector3 knockbackDirection = (transform.position - attackerPosition).normalized;
+        rb.AddForce(knockbackDirection * 5f, ForceMode.Impulse);
+
+        yield return new WaitForSeconds(2f);
+
+        transform.rotation = Quaternion.identity;
+        rb.constraints = RigidbodyConstraints.FreezeRotation;
+        
+        canMove = true;
+        isStunned = false;
+    }
+
+    // Nuevo método de la interfaz para verificar el estado de stun
+    public bool IsStunned()
+    {
+        return isStunned;
+    }
 
     public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
     {
@@ -124,22 +159,13 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IPunObservable
         {
             stream.SendNext(rb.position);
             stream.SendNext(rb.rotation);
+            stream.SendNext(isStunned);
         }
         else
         {
             networkPosition = (Vector3)stream.ReceiveNext();
             networkRotation = (Quaternion)stream.ReceiveNext();
+            isStunned = (bool)stream.ReceiveNext();
         }
     }
-
-    /*
-    // Opcional: para visualizar el rayo en el Editor.
-    private void OnDrawGizmos()
-    {
-        // Dibuja el rayo en el editor para depurar la detección del suelo.
-        Gizmos.color = isGrounded ? Color.green : Color.red;
-        Vector3 rayOrigin = transform.position + Vector3.down * 0.45f;
-        Gizmos.DrawRay(rayOrigin, Vector3.down * groundCheckDistance);
-    }
-    */
 }
