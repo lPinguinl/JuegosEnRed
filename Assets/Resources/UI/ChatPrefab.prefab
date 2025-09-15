@@ -391,9 +391,9 @@ MonoBehaviour:
   m_ChildAlignment: 0
   m_Spacing: 3
   m_ChildForceExpandWidth: 1
-  m_ChildForceExpandHeight: 1
+  m_ChildForceExpandHeight: 0
   m_ChildControlWidth: 0
-  m_ChildControlHeight: 0
+  m_ChildControlHeight: 1
   m_ChildScaleWidth: 0
   m_ChildScaleHeight: 0
   m_ReverseArrangement: 0
@@ -593,7 +593,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 200, y: 50}
+  m_SizeDelta: {x: 200, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &612978347614824340
 CanvasRenderer:
@@ -1300,6 +1300,7 @@ MonoBehaviour:
   chatContentText: {fileID: 612978347614824341}
   inputField: {fileID: 612978347129782812}
   scrollRect: {fileID: 612978347371550548}
+  chatPanel: {fileID: 612978348550975194}
 --- !u!1 &7306683120163425216
 GameObject:
   m_ObjectHideFlags: 0

@@ -14,7 +14,7 @@ public class ChatManager : MonoBehaviourPunCallbacks, IOnEventCallback
     [SerializeField] private ScrollRect scrollRect;
 
     private const byte CHAT_EVENT_CODE = 1;
-    private const int MAX_MESSAGES = 50;
+    private const int MAX_MESSAGES = 500;
 
     private List<string> messageHistory = new List<string>();
 
@@ -60,9 +60,19 @@ public class ChatManager : MonoBehaviourPunCallbacks, IOnEventCallback
             messageHistory.RemoveAt(0);
 
         chatContentText.text = string.Join("\n", messageHistory);
-        Canvas.ForceUpdateCanvases();
-        scrollRect.verticalNormalizedPosition = 0;
+
+        StartCoroutine(ForceScrollToBottom());
     }
+
+    private System.Collections.IEnumerator ForceScrollToBottom()
+    {
+        // Espera al final del frame para que Unity actualice el layout
+        yield return new WaitForEndOfFrame();
+
+        Canvas.ForceUpdateCanvases();
+        scrollRect.verticalNormalizedPosition = 0; // 0 = abajo, 1 = arriba
+    }
+
 
     #region Photon Callbacks
 
