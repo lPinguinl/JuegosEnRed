@@ -168,4 +168,10 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
             isStunned = (bool)stream.ReceiveNext();
         }
     }
+
+    public bool HasCrown()
+    {
+        return CrownManager.Instance != null &&
+               CrownManager.Instance.GetCrownHolderId() == photonView.Owner.ActorNumber;
+    }
 }

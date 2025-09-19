@@ -36,18 +36,28 @@ public class StunHandler : MonoBehaviourPun
 
         Ray ray = new Ray(transform.position, transform.forward);
         RaycastHit hit;
-        
+
         if (Physics.Raycast(ray, out hit, attackRange))
         {
-            // En lugar de buscar un Tag, buscamos la interfaz IStunable.
             IStunable stunable = hit.collider.GetComponent<IStunable>();
-            if (stunable != null && stunable.IsStunned() == false) // <-- Agregamos una verificación para evitar stun repetidos
+            if (stunable != null && stunable.IsStunned() == false)
             {
                 PhotonView targetPV = hit.collider.GetComponent<PhotonView>();
                 if (targetPV != null)
                 {
                     // Llamamos al RPC de stun en el otro jugador, pasando nuestra posición.
                     targetPV.RPC("RPC_OnStunned", RpcTarget.All, transform.position);
+
+                    // INTENTO DE ROBO DE CORONA
+                    var targetPlayer = hit.collider.GetComponent<PlayerControllerNewInput>();
+                    if (targetPlayer != null && targetPlayer.HasCrown())
+                    {
+                        // Solo el MasterClient puede transferir la corona
+                        if (PhotonNetwork.IsMasterClient)
+                        {
+                            CrownManager.Instance.TryStealCrown(photonView.Owner.ActorNumber);
+                        }
+                    }
                 }
             }
         }
