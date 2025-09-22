@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.SceneManagement;
 using Photon.Pun;
 using Photon.Realtime;
 using TMPro;
@@ -10,14 +9,12 @@ public class LobbyManager : MonoBehaviourPunCallbacks
 {
     [SerializeField] private TMP_Text roomNameText;
     [SerializeField] private Button readyButton;
-    
-    // Aquí están las variables que faltaban:
     [SerializeField] private Transform playerListContent;
     [SerializeField] private GameObject playerListItemPrefab;
 
     private bool isPlayerReady = false;
     private TMP_Text readyButtonLabel;
-    
+
     private Dictionary<int, GameObject> playerListItems = new Dictionary<int, GameObject>();
 
     private void Start()
@@ -38,8 +35,7 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         {
             Debug.LogError("[LobbyManager] Ready Button not assigned in inspector.");
         }
-        
-        // Llamamos a la función para inicializar la lista de jugadores al inicio
+
         UpdatePlayerList();
     }
 
@@ -61,13 +57,12 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         };
         PhotonNetwork.LocalPlayer.SetCustomProperties(playerProps);
     }
-    
+
     private void CheckAndStartGame()
     {
-        // Obtiene el número total de jugadores en la sala
         int playerCount = PhotonNetwork.CurrentRoom.PlayerCount;
         int readyCount = 0;
-    
+
         foreach (Player p in PhotonNetwork.PlayerList)
         {
             if (p.CustomProperties.ContainsKey("isReady") && (bool)p.CustomProperties["isReady"])
@@ -75,24 +70,22 @@ public class LobbyManager : MonoBehaviourPunCallbacks
                 readyCount++;
             }
         }
-    
-        // Si hay más de un jugador, todos deben estar listos
-        if (playerCount >= 2)
+
+        // Ahora requiere mínimo 2 jugadores para arrancar
+        if (playerCount >= 2 && readyCount == playerCount)
         {
-            if (readyCount == playerCount)
-            {
-                // Todos están listos, se inicia la partida
-                PhotonNetwork.LoadLevel("GameScene");
-            }
+            StartGame();
         }
-        // Si solo hay un jugador, el juego puede empezar cuando él ponga "Ready"
-        else if (playerCount == 1)
-        {
-            if (readyCount == 1)
-            {
-                PhotonNetwork.LoadLevel("GameScene");
-            }
-        }
+    }
+
+    private void StartGame()
+    {
+        //Cerramos la sala para que nadie pueda entrar después
+        PhotonNetwork.CurrentRoom.IsOpen = false;
+        PhotonNetwork.CurrentRoom.IsVisible = false;
+
+        Debug.Log("[LobbyManager] Todos listos. Iniciando partida...");
+        PhotonNetwork.LoadLevel("GameScene");
     }
 
     public override void OnPlayerEnteredRoom(Player newPlayer)
@@ -111,21 +104,19 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         {
             playerListItems[targetPlayer.ActorNumber].GetComponent<PlayerListItem>().UpdateInfo();
         }
-        
+
         if (changedProps.ContainsKey("isReady"))
             CheckAndStartGame();
     }
 
     private void UpdatePlayerList()
     {
-        // Limpiamos la lista actual antes de recrearla
-        foreach(var item in playerListItems.Values)
+        foreach (var item in playerListItems.Values)
         {
             Destroy(item);
         }
         playerListItems.Clear();
 
-        // Creamos un nuevo item para cada jugador en la sala
         foreach (Player player in PhotonNetwork.PlayerList)
         {
             GameObject item = Instantiate(playerListItemPrefab, playerListContent);
