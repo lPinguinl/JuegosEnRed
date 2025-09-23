@@ -61,6 +61,7 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
             Camera cam = GetComponentInChildren<Camera>(true);
             if (cam) cam.enabled = false;
         }
+
         networkPosition = transform.position;
         networkRotation = transform.rotation;
 
@@ -191,30 +192,20 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
 
         int idx = (int)owner.CustomProperties[COLOR_KEY];
 
-        // Obtener el Color desde el LobbyManager (si está en escena) o usar una paleta fallback
-        Color color = Color.white;
-        var lobby = FindObjectOfType<LobbyManager>();
-        if (lobby != null && lobby.TryGetPlayerColor(owner, out var c))
-        {
-            color = c;
-        }
-        else
-        {
-            // Fallback por si no está el LobbyManager
-            Color[] fallback = {
-                new Color(0.90f,0.20f,0.20f),
-                new Color(0.20f,0.50f,0.95f),
-                new Color(0.20f,0.80f,0.35f),
-                new Color(0.95f,0.80f,0.20f)
-            };
-            color = fallback[idx % fallback.Length];
-        }
+        // Usar siempre la paleta local (no dependemos de LobbyManager)
+        Color[] palette = {
+            new Color(0.90f,0.20f,0.20f),
+            new Color(0.20f,0.50f,0.95f),
+            new Color(0.20f,0.80f,0.35f),
+            new Color(0.95f,0.80f,0.20f)
+        };
+        Color color = palette[idx % palette.Length];
 
         foreach (var r in renderersToTint)
         {
             if (r == null) continue;
 
-            var mats = r.materials; // instancia materiales
+            var mats = r.materials;
             for (int i = 0; i < mats.Length; i++)
             {
                 var m = mats[i];
@@ -224,7 +215,6 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
                     continue;
                 }
 
-                // Intentar propiedades comunes
                 if (m.HasProperty("_BaseColor"))
                 {
                     m.SetColor("_BaseColor", color);
@@ -235,7 +225,6 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
                 }
                 else
                 {
-                    // Reemplazar por un material estándar/URP Lit coloreable
                     mats[i] = CreateColoredMaterial(color);
                 }
             }
@@ -245,7 +234,6 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
 
     private Material CreateColoredMaterial(Color c)
     {
-        // Intentar URP/Lit primero
         Shader urpLit = Shader.Find("Universal Render Pipeline/Lit");
         if (urpLit != null)
         {
@@ -255,7 +243,6 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
             return mat;
         }
 
-        // Fallback a Standard
         Shader standard = Shader.Find("Standard");
         var stdMat = new Material(standard != null ? standard : Shader.Find("Sprites/Default"));
         if (stdMat.HasProperty("_Color")) stdMat.color = c;
