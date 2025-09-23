@@ -176,6 +176,8 @@ MonoBehaviour:
   moveSpeed: 5
   jumpForce: 4
   groundCheckDistance: 1
+  renderersToTint:
+  - {fileID: 4693840884213350997}
 --- !u!114 &674708247443687902
 MonoBehaviour:
   m_ObjectHideFlags: 0
