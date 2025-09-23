@@ -4,6 +4,7 @@ using UnityEngine.UI;
 using Photon.Pun;
 using Photon.Realtime;
 using TMPro;
+using ExitGames.Client.Photon;
 
 public class LobbyManager : MonoBehaviourPunCallbacks
 {
@@ -17,12 +18,23 @@ public class LobbyManager : MonoBehaviourPunCallbacks
 
     private Dictionary<int, GameObject> playerListItems = new Dictionary<int, GameObject>();
 
+    // Paleta (hasta 4 jugadores distintos; luego cicla)
+    private readonly Color[] palette = new Color[] {
+        new Color(0.90f,0.20f,0.20f),
+        new Color(0.20f,0.50f,0.95f),
+        new Color(0.20f,0.80f,0.35f),
+        new Color(0.95f,0.80f,0.20f),
+        new Color(0.70f,0.30f,0.85f),
+        new Color(1.00f,0.55f,0.10f),
+        new Color(0.15f,0.85f,0.85f),
+        new Color(0.95f,0.40f,0.65f)
+    };
+    public const string COLOR_KEY = "playerColorIdx";
+
     private void Start()
     {
         if (roomNameText != null && PhotonNetwork.CurrentRoom != null)
-        {
             roomNameText.text = PhotonNetwork.CurrentRoom.Name;
-        }
 
         if (readyButton != null)
         {
@@ -37,6 +49,10 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         }
 
         UpdatePlayerList();
+
+        // Master asigna color a sí mismo si aún no lo tiene
+        if (PhotonNetwork.IsMasterClient)
+            EnsurePlayerHasColor(PhotonNetwork.LocalPlayer);
     }
 
     private void OnReadyClicked()
@@ -51,10 +67,7 @@ public class LobbyManager : MonoBehaviourPunCallbacks
 
     private void SetPlayerReadyState(bool ready)
     {
-        ExitGames.Client.Photon.Hashtable playerProps = new ExitGames.Client.Photon.Hashtable
-        {
-            ["isReady"] = ready
-        };
+        Hashtable playerProps = new Hashtable { ["isReady"] = ready };
         PhotonNetwork.LocalPlayer.SetCustomProperties(playerProps);
     }
 
@@ -66,21 +79,15 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         foreach (Player p in PhotonNetwork.PlayerList)
         {
             if (p.CustomProperties.ContainsKey("isReady") && (bool)p.CustomProperties["isReady"])
-            {
                 readyCount++;
-            }
         }
 
-        // Ahora requiere mínimo 2 jugadores para arrancar
         if (playerCount >= 2 && readyCount == playerCount)
-        {
             StartGame();
-        }
     }
 
     private void StartGame()
     {
-        //Cerramos la sala para que nadie pueda entrar después
         PhotonNetwork.CurrentRoom.IsOpen = false;
         PhotonNetwork.CurrentRoom.IsVisible = false;
 
@@ -90,6 +97,10 @@ public class LobbyManager : MonoBehaviourPunCallbacks
 
     public override void OnPlayerEnteredRoom(Player newPlayer)
     {
+        // Master asigna color al que entra
+        if (PhotonNetwork.IsMasterClient)
+            EnsurePlayerHasColor(newPlayer);
+
         UpdatePlayerList();
     }
 
@@ -98,12 +109,14 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         UpdatePlayerList();
     }
 
-    public override void OnPlayerPropertiesUpdate(Player targetPlayer, ExitGames.Client.Photon.Hashtable changedProps)
+    public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
     {
         if (playerListItems.ContainsKey(targetPlayer.ActorNumber))
-        {
             playerListItems[targetPlayer.ActorNumber].GetComponent<PlayerListItem>().UpdateInfo();
-        }
+
+        // Si entró un player sin color, reintentar asignación (raro, pero robusto)
+        if (PhotonNetwork.IsMasterClient && !targetPlayer.CustomProperties.ContainsKey(COLOR_KEY))
+            EnsurePlayerHasColor(targetPlayer);
 
         if (changedProps.ContainsKey("isReady"))
             CheckAndStartGame();
@@ -111,10 +124,7 @@ public class LobbyManager : MonoBehaviourPunCallbacks
 
     private void UpdatePlayerList()
     {
-        foreach (var item in playerListItems.Values)
-        {
-            Destroy(item);
-        }
+        foreach (var item in playerListItems.Values) Destroy(item);
         playerListItems.Clear();
 
         foreach (Player player in PhotonNetwork.PlayerList)
@@ -127,5 +137,38 @@ public class LobbyManager : MonoBehaviourPunCallbacks
                 playerListItems[player.ActorNumber] = item;
             }
         }
+    }
+
+    private void EnsurePlayerHasColor(Player p)
+    {
+        if (p == null) return;
+        if (p.CustomProperties != null && p.CustomProperties.ContainsKey(COLOR_KEY)) return;
+
+        // Buscar índices usados
+        HashSet<int> used = new HashSet<int>();
+        foreach (var pl in PhotonNetwork.PlayerList)
+            if (pl.CustomProperties != null && pl.CustomProperties.ContainsKey(COLOR_KEY))
+                used.Add((int)pl.CustomProperties[COLOR_KEY]);
+
+        // Elegir primer libre
+        int idx = 0;
+        while (used.Contains(idx)) idx++;
+        idx = idx % palette.Length;
+
+        Hashtable props = new Hashtable { { COLOR_KEY, idx } };
+        p.SetCustomProperties(props);
+    }
+
+    // Helper para el Player (si está en la misma escena)
+    public bool TryGetPlayerColor(Player p, out Color color)
+    {
+        color = Color.white;
+        if (p != null && p.CustomProperties != null && p.CustomProperties.ContainsKey(COLOR_KEY))
+        {
+            int idx = (int)p.CustomProperties[COLOR_KEY];
+            color = palette[idx % palette.Length];
+            return true;
+        }
+        return false;
     }
 }
