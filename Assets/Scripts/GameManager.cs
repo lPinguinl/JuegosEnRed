@@ -1,44 +1,71 @@
 using UnityEngine;
 using Photon.Pun;
-using System.Linq; // Necesario para usar .ToArray()
+using System.Collections.Generic;
+using System.Linq;
 
 public class GameManager : MonoBehaviour
 {
-    // El nombre de tu prefab de jugador dentro de la carpeta Resources/Prefabs
     [SerializeField] private string playerPrefabName = "PlayerPrefab";
-
-    // Array para almacenar los puntos de spawn
     [SerializeField] private Transform[] spawnPoints;
+
+    private static List<int> usedSpawnIndexes = new List<int>();
 
     private void Start()
     {
-        // Verifica si los puntos de spawn están asignados en el Inspector
+        GetSpawnPoints();
+
         if (spawnPoints == null || spawnPoints.Length == 0)
         {
             Debug.LogError("Error: Los puntos de spawn no están asignados en el GameManager.");
             return;
         }
 
-        // Elige un punto de spawn aleatorio del array
-        int randomSpawnIndex = Random.Range(0, spawnPoints.Length);
-        Transform spawnPoint = spawnPoints[randomSpawnIndex];
-        
-        // Instancia un prefab de jugador para cada cliente
         if (PhotonNetwork.IsConnectedAndReady)
         {
-            PhotonNetwork.Instantiate(playerPrefabName, spawnPoint.position, spawnPoint.rotation);
+            int spawnIndex = GetAvailableSpawnIndex();
+
+            if (spawnIndex != -1)
+            {
+                Transform spawnPoint = spawnPoints[spawnIndex];
+                usedSpawnIndexes.Add(spawnIndex);
+
+                PhotonNetwork.Instantiate(playerPrefabName, spawnPoint.position, spawnPoint.rotation);
+            }
+            else
+            {
+                Debug.LogWarning("No hay puntos de spawn disponibles para este jugador.");
+            }
         }
     }
 
-    // Método para obtener los puntos de spawn
     private void GetSpawnPoints()
     {
-        // Si no has asignado los puntos en el Inspector, los busca automáticamente en la escena
-        if (spawnPoints.Length == 0)
+        if (spawnPoints == null || spawnPoints.Length == 0)
         {
             spawnPoints = GameObject.FindGameObjectsWithTag("SpawnPoint")
                 .Select(go => go.transform)
                 .ToArray();
         }
+    }
+
+    private int GetAvailableSpawnIndex()
+    {
+        List<int> availableIndexes = Enumerable.Range(0, spawnPoints.Length)
+            .Where(i => !usedSpawnIndexes.Contains(i)).ToList();
+
+        if (availableIndexes.Count == 0)
+        {
+            return -1; // No hay spawn libre
+        }
+
+        // Elegir un spawn aleatorio de los disponibles
+        int randomIndex = Random.Range(0, availableIndexes.Count);
+        return availableIndexes[randomIndex];
+    }
+
+    //Reset cuando todos salen de la sala
+    public static void ResetSpawnPoints()
+    {
+        usedSpawnIndexes.Clear();
     }
 }
