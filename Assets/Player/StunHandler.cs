@@ -48,8 +48,32 @@ public class StunHandler : MonoBehaviourPun
                 {
                     // Llamamos al RPC de stun en el otro jugador, pasando nuestra posición.
                     targetPV.RPC("RPC_OnStunned", RpcTarget.All, transform.position);
+
+                    // --- Lógica de transferencia de corona ---
+                    // Solo si el target es el portador de la corona, pedir transferencia
+                    if (PhotonNetwork.CurrentRoom != null && PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey("CrownOwner"))
+                    {
+                        int crownOwner = (int)PhotonNetwork.CurrentRoom.CustomProperties["CrownOwner"];
+                        if (targetPV.Owner.ActorNumber == crownOwner)
+                        {
+                            // Pedir al MasterClient que transfiera la corona a este jugador (el atacante)
+                            photonView.RPC("RequestCrownTransfer", RpcTarget.MasterClient, PhotonNetwork.LocalPlayer.ActorNumber);
+                        }
+                    }
                 }
             }
         }
+    }
+    
+    [PunRPC]
+    public void RequestCrownTransfer(int newOwnerActorNumber)
+    {
+        if (!PhotonNetwork.IsMasterClient) return;
+
+        ExitGames.Client.Photon.Hashtable props = new ExitGames.Client.Photon.Hashtable
+        {
+            { "CrownOwner", newOwnerActorNumber }
+        };
+        PhotonNetwork.CurrentRoom.SetCustomProperties(props);
     }
 }

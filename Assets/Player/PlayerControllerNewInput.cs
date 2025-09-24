@@ -8,6 +8,8 @@ using ExitGames.Client.Photon;
 [RequireComponent(typeof(Rigidbody))]
 public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObservable
 {
+    [SerializeField] private GameObject crownVisual;
+    
     [SerializeField] private float moveSpeed = 5f;
     [SerializeField] private float jumpForce = 5f;
     [SerializeField] private float groundCheckDistance = 0.2f;
@@ -41,11 +43,13 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
         controls.Player.Move.performed += ctx => { if (photonView.IsMine) moveInput = ctx.ReadValue<Vector2>(); };
         controls.Player.Move.canceled += ctx => { if (photonView.IsMine) moveInput = Vector2.zero; };
         controls.Player.Jump.performed += ctx => { if (photonView.IsMine) TryJump(); };
+        Photon.Pun.PhotonNetwork.NetworkingClient.EventReceived += OnPhotonEvent;
     }
 
     private void OnDisable()
     {
         controls.Player.Disable();
+        Photon.Pun.PhotonNetwork.NetworkingClient.EventReceived -= OnPhotonEvent;
     }
 
     private void Start()
@@ -94,6 +98,9 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
             transform.position = Vector3.Lerp(transform.position, networkPosition, 10f * Time.fixedDeltaTime);
             transform.rotation = Quaternion.Slerp(transform.rotation, networkRotation, 10f * Time.fixedDeltaTime);
         }
+        
+        //update crown visual
+        UpdateCrownVisual();
     }
 
     private void TryJump()
@@ -254,5 +261,24 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
         var stdMat = new Material(standard != null ? standard : Shader.Find("Sprites/Default"));
         if (stdMat.HasProperty("_Color")) stdMat.color = c;
         return stdMat;
+    }
+    
+    //Crown Visual Update
+    private void UpdateCrownVisual()
+    {
+        if (crownVisual == null) return;
+
+        int myActorNumber = photonView.Owner.ActorNumber;
+        int crownOwner = GameManager.GetCrownOwnerActorNumber();
+        crownVisual.SetActive(myActorNumber == crownOwner);
+    }
+    
+    private void OnPhotonEvent(ExitGames.Client.Photon.EventData photonEvent)
+    {
+        // 252 = EventCode para CustomPropertiesUpdate en Photon
+        if (photonEvent.Code == 252)
+        {
+            UpdateCrownVisual();
+        }
     }
 }
