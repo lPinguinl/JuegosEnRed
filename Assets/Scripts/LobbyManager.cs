@@ -160,7 +160,7 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         // Elegir primer libre
         int idx = 0;
         while (used.Contains(idx)) idx++;
-        idx = idx % palette.Length // cicla si supera la paleta
+        idx = idx % palette.Length; // cicla si supera la paleta
 
         // Guardar el índice en las propiedades del jugador 'p'
         Hashtable props = new Hashtable { { COLOR_KEY, idx } };
