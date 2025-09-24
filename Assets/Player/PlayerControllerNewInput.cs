@@ -26,6 +26,7 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
     private bool canMove = true;
     private bool isStunned = false;
 
+    // Nombre de la propiedad de Photon donde guardamos el indice de color del player
     private const string COLOR_KEY = "playerColorIdx";
 
     private void Awake()
@@ -181,6 +182,10 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
     }
 
     // ===== Color =====
+    // En el lobby, el Master asigna a cada jugador un índice de color único y lo guarda en COLOR_KEY.
+    // Photon replica esa propiedad a todos.
+    // Acá leemos el índice del dueño de este Player y pintamos los Renderers.
+    // Si el material no tiene propiedad de color, creamos uno compatible en runtime.
 
     private void ApplyColorFromProperties()
     {
@@ -204,7 +209,7 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
         foreach (var r in renderersToTint)
         {
             if (r == null) continue;
-
+            // materials devuelve instancias (no toca el prefab) lo que lo hace mas seguro para pintar
             var mats = r.materials;
             for (int i = 0; i < mats.Length; i++)
             {
@@ -215,6 +220,7 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
                     continue;
                 }
 
+                // Si el shader expone color, lo seteamos. Si no, reemplazamos por un material coloreable. 
                 if (m.HasProperty("_BaseColor"))
                 {
                     m.SetColor("_BaseColor", color);
@@ -231,6 +237,7 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
             r.materials = mats;
         }
     }
+    // Crea un material coloreable compatible (URP/Lit si existe, si no Standard)
 
     private Material CreateColoredMaterial(Color c)
     {
