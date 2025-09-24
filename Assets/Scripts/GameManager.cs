@@ -1,19 +1,29 @@
-using UnityEngine;
-using Photon.Pun;
+using System.Collections.Generic;
 using System.Linq;
+using Photon.Pun;
+using Photon.Realtime;
 using TMPro;
+using UnityEngine;
 
 public class GameManager : MonoBehaviour, IGameEndHandler
 {
+    private const string CrownOwnerPropertyKey = "CrownOwner";
+    private const string MatchWinnerKey = "MatchWinner";
+    private const string MatchScoresActorNumbersKey = "MatchScoresActorNumbers";
+    private const string MatchScoresValuesKey = "MatchScoresValues";
+
     [Header("Spawn")]
     [SerializeField] private string playerPrefabName = "PlayerPrefab";
     [SerializeField] private Transform[] spawnPoints;
 
     [Header("Match Timer")]
-    [SerializeField] private GameTimer gameTimer;                 
-    [SerializeField] private TimerTextPresenter timerPresenter;   
-    [SerializeField] private double matchDurationSeconds = 60.0;  
+    [SerializeField] private GameTimer gameTimer;
+    [SerializeField] private TimerTextPresenter timerPresenter;
+    [SerializeField] private double matchDurationSeconds = 60.0;
     [SerializeField] private string resultScene = "ResultScene";
+
+    [Header("Scoring")]
+    [SerializeField] private ScoreManager scoreManager;
 
     private IMatchClock matchClock;  // (usa PhotonNetwork.Time)
 
@@ -39,6 +49,11 @@ public class GameManager : MonoBehaviour, IGameEndHandler
         if (timerPresenter == null)
         {
             Debug.LogError("Error: TimerTextPresenter no asignado en GameManager.");
+            return;
+        } 
+        if (scoreManager == null)
+        {
+            Debug.LogError("Error: ScoreManager no asignado en GameManager.");
             return;
         }
 
@@ -78,11 +93,51 @@ public class GameManager : MonoBehaviour, IGameEndHandler
     public void OnMatchTimeEnded()
     {
         Debug.Log($"[GameManager] OnMatchTimeEnded called. Master={PhotonNetwork.IsMasterClient}, scene={resultScene}");
-        if (PhotonNetwork.IsMasterClient)
+
+        if (!PhotonNetwork.IsMasterClient)
         {
-            // se carga la escena con el automaticallysyncscene !!! (importante sino no se me mostraba a todos)
-            PhotonNetwork.LoadLevel(resultScene);
+            // Si no somos el master, solo esperamos a que él haga la transición.
+            return;
         }
+
+        Player winner = null;
+        Dictionary<int, int> scoreSnapshot = null;
+
+        if (scoreManager != null)
+        {
+            bool hasWinner = scoreManager.TryDetermineWinner(out winner, out scoreSnapshot);
+            if (hasWinner && winner != null)
+            {
+                var roomProps = new ExitGames.Client.Photon.Hashtable
+                {
+                    { "MatchWinner", winner.ActorNumber }
+                };
+
+                if (scoreSnapshot != null && scoreSnapshot.Count > 0)
+                {
+                    int[] actorNumbers = new int[scoreSnapshot.Count];
+                    int[] scores = new int[scoreSnapshot.Count];
+                    int index = 0;
+                    foreach (var kvp in scoreSnapshot)
+                    {
+                        actorNumbers[index] = kvp.Key;
+                        scores[index] = kvp.Value;
+                        index++;
+                    }
+
+                    roomProps["MatchScoresActorNumbers"] = actorNumbers;
+                    roomProps["MatchScoresValues"] = scores;
+                }
+
+                PhotonNetwork.CurrentRoom.SetCustomProperties(roomProps);
+            }
+            else
+            {
+                Debug.LogWarning("[GameManager] No se pudo determinar un ganador antes de cambiar de escena.");
+            }
+        }
+
+        PhotonNetwork.LoadLevel(resultScene);
     }
 
     // Si quisieras cargar spawn points por tag, mantené esto privado (no se usa en este flujo)
