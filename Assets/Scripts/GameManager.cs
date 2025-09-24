@@ -13,7 +13,7 @@ public class GameManager : MonoBehaviour, IGameEndHandler
     [SerializeField] private GameTimer gameTimer;                 // Asignar en Inspector (GameObject con GameTimer)
     [SerializeField] private TimerTextPresenter timerPresenter;   // Asignar en Inspector (GameObject con TimerTextPresenter)
     [SerializeField] private double matchDurationSeconds = 60.0;  // Configurable
-    [SerializeField] private string resultSceneName = "Result Scene";
+    [SerializeField] private string resultScene = "ResultScene";
 
     private IMatchClock matchClock;
 
@@ -58,9 +58,10 @@ public class GameManager : MonoBehaviour, IGameEndHandler
     // Callback del GameTimer al finalizar
     public void OnMatchTimeEnded()
     {
+        Debug.Log($"[GameManager] OnMatchTimeEnded called. Master={PhotonNetwork.IsMasterClient}, scene={resultScene}");
         if (PhotonNetwork.IsMasterClient)
         {
-            PhotonNetwork.LoadLevel(resultSceneName);
+            PhotonNetwork.LoadLevel(resultScene);
         }
     }
 
