@@ -29,6 +29,8 @@ public class PhotonConnector : MonoBehaviourPunCallbacks
 
     private void Awake()
     {
+        PhotonNetwork.AutomaticallySyncScene = true;
+
         if (_instance != null && _instance != this)
         {
             Destroy(gameObject);
