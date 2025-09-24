@@ -61,6 +61,7 @@ public class GameTimer : MonoBehaviourPunCallbacks
         if (remaining <= 0.0 && !finished)
         {
             finished = true;
+            Debug.Log("[GameTimer] Time ended, notifying GameManager");
             endHandler?.OnMatchTimeEnded();
         }
     }
