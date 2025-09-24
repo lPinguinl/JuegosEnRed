@@ -114,7 +114,7 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         if (playerListItems.ContainsKey(targetPlayer.ActorNumber))
             playerListItems[targetPlayer.ActorNumber].GetComponent<PlayerListItem>().UpdateInfo();
 
-        // Si entró un player sin color, reintentar asignación (raro, pero robusto)
+        // Si entró un player sin color, reintentar asignación 
         if (PhotonNetwork.IsMasterClient && !targetPlayer.CustomProperties.ContainsKey(COLOR_KEY))
             EnsurePlayerHasColor(targetPlayer);
 
