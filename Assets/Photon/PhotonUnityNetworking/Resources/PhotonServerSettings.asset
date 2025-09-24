@@ -41,6 +41,7 @@ MonoBehaviour:
   - RespawnSpaceship
   - RPC_OnStunned
   - RPC_TryStun
+  - RequestCrownTransfer
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 0

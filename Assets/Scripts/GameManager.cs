@@ -57,6 +57,21 @@ public class GameManager : MonoBehaviour, IGameEndHandler
         {
             PhotonNetwork.Instantiate(playerPrefabName, spawnPoint.position, spawnPoint.rotation);
         }
+        
+        // Solo el MasterClient inicializa la corona
+        if (PhotonNetwork.IsMasterClient)
+        {
+            // Elegir un jugador aleatorio para empezar con la corona
+            var players = PhotonNetwork.PlayerList;
+            int randomIdx = Random.Range(0, players.Length);
+            int crownOwnerActorNumber = players[randomIdx].ActorNumber;
+
+            ExitGames.Client.Photon.Hashtable props = new ExitGames.Client.Photon.Hashtable
+            {
+                { "CrownOwner", crownOwnerActorNumber }
+            };
+            PhotonNetwork.CurrentRoom.SetCustomProperties(props);
+        }
     }
 
     // Callback del GameTimer al finalizar
@@ -79,5 +94,12 @@ public class GameManager : MonoBehaviour, IGameEndHandler
                 .Select(go => go.transform)
                 .ToArray();
         }
+    }
+    
+    public static int GetCrownOwnerActorNumber()
+    {
+        if (PhotonNetwork.CurrentRoom != null && PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey("CrownOwner"))
+            return (int)PhotonNetwork.CurrentRoom.CustomProperties["CrownOwner"];
+        return -1;
     }
 }
