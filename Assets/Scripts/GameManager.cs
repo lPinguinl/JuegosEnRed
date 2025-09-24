@@ -10,16 +10,16 @@ public class GameManager : MonoBehaviour, IGameEndHandler
     [SerializeField] private Transform[] spawnPoints;
 
     [Header("Match Timer")]
-    [SerializeField] private GameTimer gameTimer;                 // Asignar en Inspector (GameObject con GameTimer)
-    [SerializeField] private TimerTextPresenter timerPresenter;   // Asignar en Inspector (GameObject con TimerTextPresenter)
-    [SerializeField] private double matchDurationSeconds = 60.0;  // Configurable
+    [SerializeField] private GameTimer gameTimer;                 
+    [SerializeField] private TimerTextPresenter timerPresenter;   
+    [SerializeField] private double matchDurationSeconds = 60.0;  
     [SerializeField] private string resultScene = "ResultScene";
 
-    private IMatchClock matchClock;
+    private IMatchClock matchClock;  // (usa PhotonNetwork.Time)
 
     private void Awake()
     {
-        // Inyectamos el reloj sincronizado con Photon
+        // Reloj global de Photon para que todos cuenten el mismo tiempo
         matchClock = new PhotonMatchClock();
     }
 
@@ -42,7 +42,11 @@ public class GameManager : MonoBehaviour, IGameEndHandler
             return;
         }
 
-        // Inicializar timer sincronizado (sin FindObject)
+        
+       
+       // calculan el tiempo restante con PhotonNetwork.Time.
+        // - Cuando llega a 0, GameTimer llama OnMatchTimeEnded() en este GameManager.
+        
         gameTimer.Initialize(matchClock, timerPresenter, this, matchDurationSeconds);
 
         // Spawn del jugador local
@@ -61,6 +65,7 @@ public class GameManager : MonoBehaviour, IGameEndHandler
         Debug.Log($"[GameManager] OnMatchTimeEnded called. Master={PhotonNetwork.IsMasterClient}, scene={resultScene}");
         if (PhotonNetwork.IsMasterClient)
         {
+            // se carga la escena con el automaticallysyncscene !!! (importante sino no se me mostraba a todos)
             PhotonNetwork.LoadLevel(resultScene);
         }
     }

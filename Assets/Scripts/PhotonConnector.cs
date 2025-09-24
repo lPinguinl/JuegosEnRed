@@ -29,6 +29,7 @@ public class PhotonConnector : MonoBehaviourPunCallbacks
 
     private void Awake()
     {
+        // Permite que cuando el timer llegue a 0 se cambie de pantalla para todos
         PhotonNetwork.AutomaticallySyncScene = true;
 
         if (_instance != null && _instance != this)

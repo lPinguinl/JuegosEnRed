@@ -29,6 +29,7 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         new Color(0.15f,0.85f,0.85f),
         new Color(0.95f,0.40f,0.65f)
     };
+    // Clave de la Player Custom Property donde guardamos el "índice de color"
     public const string COLOR_KEY = "playerColorIdx";
 
     private void Start()
@@ -114,7 +115,7 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         if (playerListItems.ContainsKey(targetPlayer.ActorNumber))
             playerListItems[targetPlayer.ActorNumber].GetComponent<PlayerListItem>().UpdateInfo();
 
-        // Si entró un player sin color, reintentar asignación (raro, pero robusto)
+        // Si entró un player sin color, reintentar asignación
         if (PhotonNetwork.IsMasterClient && !targetPlayer.CustomProperties.ContainsKey(COLOR_KEY))
             EnsurePlayerHasColor(targetPlayer);
 
@@ -139,6 +140,12 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         }
     }
 
+    // Buscamos qué índices ya están usados por otros jugadores (leyendo sus Custom Properties).
+    // Elegimos el primer índice libre y lo "modulamos" por la cantidad de colores disponibles.
+    // Guardamos ese índice en las Player Custom Properties del jugador 'p' (clave COLOR_KEY).
+    
+    // - Todos los clientes ven el mismo índice para ese jugador.
+    // - En la escena de juego, cada avatar leerá ese índice y pintará sus materiales.
     private void EnsurePlayerHasColor(Player p)
     {
         if (p == null) return;
@@ -153,10 +160,11 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         // Elegir primer libre
         int idx = 0;
         while (used.Contains(idx)) idx++;
-        idx = idx % palette.Length;
+        idx = idx % palette.Length // cicla si supera la paleta
 
+        // Guardar el índice en las propiedades del jugador 'p'
         Hashtable props = new Hashtable { { COLOR_KEY, idx } };
-        p.SetCustomProperties(props);
+        p.SetCustomProperties(props); // Photon replica esto a todos
     }
 
     // Helper para el Player (si está en la misma escena)
