@@ -3,6 +3,7 @@ using Photon.Pun;
 using ExitGames.Client.Photon;
 using System.Collections;
 using System.Diagnostics;
+using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 // Interfaz: el GameManager implementa esto para enterarse cuando el tiempo llega a 0
 public interface IGameEndHandler
@@ -75,7 +76,7 @@ public class GameTimer : MonoBehaviourPunCallbacks
         if (remaining <= 0.0 && !finished)
         {
             finished = true;
-            Debug.Log("[GameTimer] Time ended, notifying GameManager");
+            
             endHandler?.OnMatchTimeEnded(); // El GameManager (si es Master) hará el LoadLevel
         }
     }
