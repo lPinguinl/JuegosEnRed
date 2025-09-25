@@ -15,22 +15,22 @@ public class LobbyManager : MonoBehaviourPunCallbacks
 
     private bool isPlayerReady = false;
     private TMP_Text readyButtonLabel;
-
     private Dictionary<int, GameObject> playerListItems = new Dictionary<int, GameObject>();
 
-    // Paleta (hasta 4 jugadores distintos; luego cicla)
+    // Paleta de colores 
     private readonly Color[] palette = new Color[] {
-        new Color(0.90f,0.20f,0.20f),
-        new Color(0.20f,0.50f,0.95f),
-        new Color(0.20f,0.80f,0.35f),
-        new Color(0.95f,0.80f,0.20f),
-        new Color(0.70f,0.30f,0.85f),
-        new Color(1.00f,0.55f,0.10f),
-        new Color(0.15f,0.85f,0.85f),
-        new Color(0.95f,0.40f,0.65f)
+        new Color(0.90f,0.20f,0.20f),  // Rojo
+        new Color(0.20f,0.50f,0.95f),  // Azul
+        new Color(0.20f,0.80f,0.35f),  // Verde
+        new Color(0.95f,0.80f,0.20f),  // Amarillo
+        new Color(0.70f,0.30f,0.85f),  // Violeta
+        new Color(1.00f,0.55f,0.10f),  // Naranja
+        new Color(0.15f,0.85f,0.85f),  // Cian
+        new Color(0.95f,0.40f,0.65f)   // Rosa
     };
-    // Clave de la Player Custom Property donde guardamos el "índice de color"
+
     public const string COLOR_KEY = "playerColorIdx";
+    private const string READY_KEY = "isReady";
 
     private void Start()
     {
@@ -49,11 +49,11 @@ public class LobbyManager : MonoBehaviourPunCallbacks
             Debug.LogError("[LobbyManager] Ready Button not assigned in inspector.");
         }
 
+        // Actualizamos la lista inicial de jugadores
         UpdatePlayerList();
 
-        // Master asigna color a sí mismo si aún no lo tiene
-        if (PhotonNetwork.IsMasterClient)
-            EnsurePlayerHasColor(PhotonNetwork.LocalPlayer);
+        // Asignar color al jugador local si no tiene
+        EnsurePlayerHasColor(PhotonNetwork.LocalPlayer);
     }
 
     private void OnReadyClicked()
@@ -63,14 +63,17 @@ public class LobbyManager : MonoBehaviourPunCallbacks
             readyButtonLabel.text = isPlayerReady ? "Unready" : "Ready";
 
         SetPlayerReadyState(isPlayerReady);
-        // Solo el Master evalúa si iniciar el juego
+
         if (PhotonNetwork.IsMasterClient)
-            CheckAndStartGame(); 
+            CheckAndStartGame();
     }
 
     private void SetPlayerReadyState(bool ready)
     {
-        Hashtable playerProps = new Hashtable { ["isReady"] = ready };
+        ExitGames.Client.Photon.Hashtable playerProps = new ExitGames.Client.Photon.Hashtable
+        {
+            [READY_KEY] = ready
+        };
         PhotonNetwork.LocalPlayer.SetCustomProperties(playerProps);
     }
 
@@ -81,60 +84,62 @@ public class LobbyManager : MonoBehaviourPunCallbacks
 
         foreach (Player p in PhotonNetwork.PlayerList)
         {
-            if (p.CustomProperties.ContainsKey("isReady") && (bool)p.CustomProperties["isReady"])
+            if (p.CustomProperties.TryGetValue(READY_KEY, out object readyObj) &&
+                readyObj is bool isReady && isReady)
+            {
                 readyCount++;
+            }
         }
 
+        // ✅ Solo arranca si hay mínimo 2 jugadores y todos están listos
         if (playerCount >= 2 && readyCount == playerCount)
+        {
             StartGame();
+        }
     }
 
     private void StartGame()
     {
-        // Guard extra por si algún cliente no-Master lo llama accidentalmente
         if (!PhotonNetwork.IsMasterClient) return;
-        
+
         PhotonNetwork.CurrentRoom.IsOpen = false;
         PhotonNetwork.CurrentRoom.IsVisible = false;
 
-        Debug.Log("[LobbyManager] Todos listos. Iniciando partida...");
         PhotonNetwork.LoadLevel("GameScene");
     }
 
     public override void OnPlayerEnteredRoom(Player newPlayer)
     {
-        // Master asigna color al que entra
-        if (PhotonNetwork.IsMasterClient)
-            EnsurePlayerHasColor(newPlayer);
-
+        EnsurePlayerHasColor(newPlayer);
         UpdatePlayerList();
+
+        if (PhotonNetwork.IsMasterClient)
+            CheckAndStartGame();
     }
 
     public override void OnPlayerLeftRoom(Player otherPlayer)
     {
         UpdatePlayerList();
+
+        if (PhotonNetwork.IsMasterClient)
+            CheckAndStartGame();
     }
 
-    public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
+    public override void OnPlayerPropertiesUpdate(Player targetPlayer, ExitGames.Client.Photon.Hashtable changedProps)
     {
-        if (playerListItems.ContainsKey(targetPlayer.ActorNumber))
-            playerListItems[targetPlayer.ActorNumber].GetComponent<PlayerListItem>().UpdateInfo();
-
-
-        if (PhotonNetwork.IsMasterClient && !targetPlayer.CustomProperties.ContainsKey(COLOR_KEY))
-            EnsurePlayerHasColor(targetPlayer);
-
-        if (changedProps.ContainsKey("isReady"))
+        if (playerListItems.TryGetValue(targetPlayer.ActorNumber, out GameObject item))
         {
-            // Solo el Master evalúa si iniciar el juego
-            if (PhotonNetwork.IsMasterClient)
-                CheckAndStartGame();
+            item.GetComponent<PlayerListItem>().UpdateInfo();
         }
+
+        if (changedProps.ContainsKey(READY_KEY) && PhotonNetwork.IsMasterClient)
+            CheckAndStartGame();
     }
 
     private void UpdatePlayerList()
     {
-        foreach (var item in playerListItems.Values) Destroy(item);
+        foreach (var item in playerListItems.Values)
+            Destroy(item);
         playerListItems.Clear();
 
         foreach (Player player in PhotonNetwork.PlayerList)
@@ -149,43 +154,29 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         }
     }
 
-    // Buscamos qué índices ya están usados por otros jugadores (leyendo sus Custom Properties).
-    // Elegimos el primer índice libre y lo "modulamos" por la cantidad de colores disponibles.
-    // Guardamos ese índice en las Player Custom Properties del jugador 'p' (clave COLOR_KEY).
-    
-    // - Todos los clientes ven el mismo índice para ese jugador.
-    // - En la escena de juego, cada avatar leerá ese índice y pintará sus materiales.
     private void EnsurePlayerHasColor(Player p)
     {
         if (p == null) return;
-        if (p.CustomProperties != null && p.CustomProperties.ContainsKey(COLOR_KEY)) return;
 
-        // Buscar índices usados
-        HashSet<int> used = new HashSet<int>();
+        if (p.CustomProperties.ContainsKey(COLOR_KEY))
+            return; // Ya tiene un color asignado
+
+        HashSet<int> usedIndices = new HashSet<int>();
         foreach (var pl in PhotonNetwork.PlayerList)
-            if (pl.CustomProperties != null && pl.CustomProperties.ContainsKey(COLOR_KEY))
-                used.Add((int)pl.CustomProperties[COLOR_KEY]);
-
-        // Elegir primer libre
-        int idx = 0;
-        while (used.Contains(idx)) idx++;
-        idx = idx % palette.Length; // cicla si supera la paleta
-
-        // Guardar el índice en las propiedades del jugador 'p'
-        Hashtable props = new Hashtable { { COLOR_KEY, idx } };
-        p.SetCustomProperties(props); // Photon replica esto a todos
-    }
-
-    // Helper para el Player (si está en la misma escena)
-    public bool TryGetPlayerColor(Player p, out Color color)
-    {
-        color = Color.white;
-        if (p != null && p.CustomProperties != null && p.CustomProperties.ContainsKey(COLOR_KEY))
         {
-            int idx = (int)p.CustomProperties[COLOR_KEY];
-            color = palette[idx % palette.Length];
-            return true;
+            if (pl.CustomProperties.TryGetValue(COLOR_KEY, out object idxObj))
+                usedIndices.Add((int)idxObj);
         }
-        return false;
+
+        // Elegimos el primer índice de color disponible
+        int newIdx = 0;
+        while (usedIndices.Contains(newIdx))
+            newIdx = (newIdx + 1) % palette.Length;
+
+        ExitGames.Client.Photon.Hashtable props = new ExitGames.Client.Photon.Hashtable
+        {
+            [COLOR_KEY] = newIdx
+        };
+        p.SetCustomProperties(props);
     }
 }
