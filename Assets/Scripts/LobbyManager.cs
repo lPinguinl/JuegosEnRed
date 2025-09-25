@@ -63,7 +63,9 @@ public class LobbyManager : MonoBehaviourPunCallbacks
             readyButtonLabel.text = isPlayerReady ? "Unready" : "Ready";
 
         SetPlayerReadyState(isPlayerReady);
-        CheckAndStartGame();
+        // Solo el Master evalúa si iniciar el juego
+        if (PhotonNetwork.IsMasterClient)
+            CheckAndStartGame(); 
     }
 
     private void SetPlayerReadyState(bool ready)
@@ -89,6 +91,9 @@ public class LobbyManager : MonoBehaviourPunCallbacks
 
     private void StartGame()
     {
+        // Guard extra por si algún cliente no-Master lo llama accidentalmente
+        if (!PhotonNetwork.IsMasterClient) return;
+        
         PhotonNetwork.CurrentRoom.IsOpen = false;
         PhotonNetwork.CurrentRoom.IsVisible = false;
 
@@ -120,7 +125,11 @@ public class LobbyManager : MonoBehaviourPunCallbacks
             EnsurePlayerHasColor(targetPlayer);
 
         if (changedProps.ContainsKey("isReady"))
-            CheckAndStartGame();
+        {
+            // Solo el Master evalúa si iniciar el juego
+            if (PhotonNetwork.IsMasterClient)
+                CheckAndStartGame();
+        }
     }
 
     private void UpdatePlayerList()
