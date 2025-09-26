@@ -83,7 +83,7 @@ public class ScoreManager : MonoBehaviourPunCallbacks
         }
         else
         {
-            var props = new Hashtable { { CrownScoreKey, 0 } };
+            var props = new ExitGames.Client.Photon.Hashtable { { CrownScoreKey, 0 } };
             player.SetCustomProperties(props);
         }
 
@@ -121,7 +121,7 @@ public class ScoreManager : MonoBehaviourPunCallbacks
         if (increment <= 0) return;
 
         int newScore = currentScore + increment;
-        var props = new Hashtable { { CrownScoreKey, newScore } };
+        var props = new ExitGames.Client.Photon.Hashtable { { CrownScoreKey, newScore } };
         player.SetCustomProperties(props);
 
         var tracker = GetOrCreateTracker(actorNumber);
@@ -220,5 +220,41 @@ public class ScoreManager : MonoBehaviourPunCallbacks
 
         winner = bestPlayer ?? candidates[0];
         return true;
+    }
+
+    // NUEVO: Publica ganador y snapshot de puntajes en Room Properties
+    public void PublishResultsToRoom()
+    {
+        if (!PhotonNetwork.IsMasterClient || PhotonNetwork.CurrentRoom == null)
+        {
+            Debug.LogWarning("[ScoreManager] Solo el MasterClient puede publicar resultados o la sala es nula.");
+            return;
+        }
+
+        if (!TryDetermineWinner(out Player winner, out Dictionary<int, int> scoreSnapshot))
+        {
+            Debug.LogWarning("[ScoreManager] No se pudo determinar un ganador.");
+            return;
+        }
+
+        int[] actorNumbers = new int[scoreSnapshot.Count];
+        int[] scores = new int[scoreSnapshot.Count];
+        int idx = 0;
+        foreach (var kv in scoreSnapshot)
+        {
+            actorNumbers[idx] = kv.Key;
+            scores[idx] = kv.Value;
+            idx++;
+        }
+
+        var roomProps = new ExitGames.Client.Photon.Hashtable
+        {
+            { "MatchWinner", winner != null ? winner.ActorNumber : -1 },
+            { "MatchScoresActorNumbers", actorNumbers },
+            { "MatchScoresValues", scores }
+        };
+
+        PhotonNetwork.CurrentRoom.SetCustomProperties(roomProps);
+        Debug.Log($"[ScoreManager] Results published. Winner actor: {(winner != null ? winner.ActorNumber : -1)}");
     }
 }
