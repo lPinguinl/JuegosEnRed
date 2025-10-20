@@ -268,7 +268,7 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
     {
         if (crownVisual == null) return;
 
-        int myActorNumber = photonView.Owner.ActorNumber;
+                int myActorNumber = photonView.Owner.ActorNumber;
         int crownOwner = GameManager.GetCrownOwnerActorNumber();
         crownVisual.SetActive(myActorNumber == crownOwner);
     }
