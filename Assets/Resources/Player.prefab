@@ -160,7 +160,7 @@ MonoBehaviour:
   jumpForce: 4
   groundCheckDistance: 1
   renderersToTint:
-  - {fileID: 0}
+  - {fileID: 6822420418021499060}
 --- !u!114 &674708247443687902
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -522,5 +522,10 @@ PrefabInstance:
 --- !u!4 &5685011563872050139 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: acbf4c250234bdc41918d845d1c10b11, type: 3}
+  m_PrefabInstance: {fileID: 5291604874531290160}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &6822420418021499060 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: -7511558181221131132, guid: acbf4c250234bdc41918d845d1c10b11, type: 3}
   m_PrefabInstance: {fileID: 5291604874531290160}
   m_PrefabAsset: {fileID: 0}
