@@ -9,12 +9,11 @@ using ExitGames.Client.Photon;
 public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObservable
 {
     [SerializeField] private GameObject crownVisual;
-    
+
     [SerializeField] private float moveSpeed = 5f;
     [SerializeField] private float jumpForce = 5f;
     [SerializeField] private float groundCheckDistance = 0.2f;
 
-    // Renderers a teñir (asignar en el inspector)
     [SerializeField] private Renderer[] renderersToTint;
 
     private Rigidbody rb;
@@ -28,13 +27,18 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
     private bool canMove = true;
     private bool isStunned = false;
 
-    // Nombre de la propiedad de Photon donde guardamos el indice de color del player
     private const string COLOR_KEY = "playerColorIdx";
+
+    private InputAction crownClaimAction;           // Acción manual para la tecla E (Input System)
+    private GameStateManager cachedStateManager;    // Referencia perezosa al gestor de estados
 
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
         controls = new PlayerControls();
+
+        // Acción rápida para la tecla E (Interactuar con la corona antes de iniciar la partida).
+        crownClaimAction = new InputAction("ClaimCrown", binding: "<Keyboard>/e");
     }
 
     private void OnEnable()
@@ -43,13 +47,26 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
         controls.Player.Move.performed += ctx => { if (photonView.IsMine) moveInput = ctx.ReadValue<Vector2>(); };
         controls.Player.Move.canceled += ctx => { if (photonView.IsMine) moveInput = Vector2.zero; };
         controls.Player.Jump.performed += ctx => { if (photonView.IsMine) TryJump(); };
-        Photon.Pun.PhotonNetwork.NetworkingClient.EventReceived += OnPhotonEvent;
+
+        crownClaimAction.performed += OnCrownClaimPerformed;
+        crownClaimAction.Enable();
+
+        PhotonNetwork.NetworkingClient.EventReceived += OnPhotonEvent;
     }
 
     private void OnDisable()
     {
         controls.Player.Disable();
-        Photon.Pun.PhotonNetwork.NetworkingClient.EventReceived -= OnPhotonEvent;
+
+        crownClaimAction.performed -= OnCrownClaimPerformed;
+        crownClaimAction.Disable();
+
+        PhotonNetwork.NetworkingClient.EventReceived -= OnPhotonEvent;
+    }
+
+    private void OnDestroy()
+    {
+        crownClaimAction?.Dispose();
     }
 
     private void Start()
@@ -70,7 +87,6 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
         networkPosition = transform.position;
         networkRotation = transform.rotation;
 
-        // Aplicar color según CustomProperties del Owner
         ApplyColorFromProperties();
     }
 
@@ -98,8 +114,7 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
             transform.position = Vector3.Lerp(transform.position, networkPosition, 10f * Time.fixedDeltaTime);
             transform.rotation = Quaternion.Slerp(transform.rotation, networkRotation, 10f * Time.fixedDeltaTime);
         }
-        
-        //update crown visual
+
         UpdateCrownVisual();
     }
 
@@ -119,14 +134,7 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
         if (Physics.Raycast(ray, out RaycastHit hit, groundCheckDistance))
         {
             var walkable = hit.collider.GetComponent<IWalkableSurface>();
-            if (walkable != null && walkable.IsWalkable())
-            {
-                isGrounded = true;
-            }
-            else
-            {
-                isGrounded = false;
-            }
+            isGrounded = walkable != null && walkable.IsWalkable();
         }
         else
         {
@@ -134,16 +142,47 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
         }
     }
 
-    // Método de la interfaz IStunable (Ahora llamado por el RPC)
+    // === Interacción con la corona durante la cuenta regresiva ===
+    private void OnCrownClaimPerformed(InputAction.CallbackContext context)
+    {
+        if (!photonView.IsMine)
+        {
+            return;
+        }
+
+        GameStateManager manager = ResolveStateManager();
+        if (manager == null)
+        {
+            return;
+        }
+
+        manager.ReportCrownAttempt(photonView.OwnerActorNr);
+    }
+
+    private GameStateManager ResolveStateManager()
+    {
+        if (cachedStateManager == null)
+        {
+            cachedStateManager = FindObjectOfType<GameStateManager>();
+            if (cachedStateManager == null)
+            {
+                Debug.LogWarning("[PlayerController] GameStateManager no encontrado en escena.");
+            }
+        }
+
+        return cachedStateManager;
+    }
+
+    // Método requerido por IStunable (llamado mediante RPC)
     public void Stun(Vector3 attackerPosition)
     {
-        // No necesitamos código aquí porque la lógica está en el RPC
+        // La lógica concreta del stun se encuentra en RPC_OnStunned.
     }
 
     [PunRPC]
     private void RPC_OnStunned(Vector3 attackerPosition)
     {
-        if (isStunned) return; // Evita stuns repetidos en la misma máquina
+        if (isStunned) return;
 
         isStunned = true;
         StartCoroutine(StunCoroutine(attackerPosition));
@@ -166,7 +205,6 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
         isStunned = false;
     }
 
-    // Nuevo método de la interfaz para verificar el estado de stun
     public bool IsStunned()
     {
         return isStunned;
@@ -188,12 +226,6 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
         }
     }
 
-    // ===== Color =====
-    // En el lobby, el Master asigna a cada jugador un índice de color único y lo guarda en COLOR_KEY.
-    // Photon replica esa propiedad a todos.
-    // Acá leemos el índice del dueño de este Player y pintamos los Renderers.
-    // Si el material no tiene propiedad de color, creamos uno compatible en runtime.
-
     private void ApplyColorFromProperties()
     {
         if (renderersToTint == null || renderersToTint.Length == 0) return;
@@ -204,7 +236,6 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
 
         int idx = (int)owner.CustomProperties[COLOR_KEY];
 
-        // Usar siempre la paleta local (no dependemos de LobbyManager)
         Color[] palette = {
             new Color(0.90f,0.20f,0.20f),
             new Color(0.20f,0.50f,0.95f),
@@ -216,7 +247,6 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
         foreach (var r in renderersToTint)
         {
             if (r == null) continue;
-            // materials devuelve instancias (no toca el prefab) lo que lo hace mas seguro para pintar
             var mats = r.materials;
             for (int i = 0; i < mats.Length; i++)
             {
@@ -227,7 +257,6 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
                     continue;
                 }
 
-                // Si el shader expone color, lo seteamos. Si no, reemplazamos por un material coloreable. 
                 if (m.HasProperty("_BaseColor"))
                 {
                     m.SetColor("_BaseColor", color);
@@ -244,7 +273,6 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
             r.materials = mats;
         }
     }
-    // Crea un material coloreable compatible (URP/Lit si existe, si no Standard)
 
     private Material CreateColoredMaterial(Color c)
     {
@@ -262,20 +290,19 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
         if (stdMat.HasProperty("_Color")) stdMat.color = c;
         return stdMat;
     }
-    
-    //Crown Visual Update
+
     private void UpdateCrownVisual()
     {
         if (crownVisual == null) return;
 
-                int myActorNumber = photonView.Owner.ActorNumber;
+        int myActorNumber = photonView.Owner.ActorNumber;
         int crownOwner = GameManager.GetCrownOwnerActorNumber();
         crownVisual.SetActive(myActorNumber == crownOwner);
     }
-    
-    private void OnPhotonEvent(ExitGames.Client.Photon.EventData photonEvent)
+
+    private void OnPhotonEvent(EventData photonEvent)
     {
-        // 252 = EventCode para CustomPropertiesUpdate en Photon
+        // 252 = EventCode interno de Photon para actualizar CustomProperties de Room/Player.
         if (photonEvent.Code == 252)
         {
             UpdateCrownVisual();
