@@ -12,19 +12,19 @@ public interface IGameEndHandler
 }
 
 
-// Usa Room Custom Properties para guardar el inicio y la duraciÛn
+// Usa Room Custom Properties para guardar el inicio y la duraci√≥n
 // Usa el reloj global de Photon (PhotonNetwork.Time) para que todos cuenten igual
 // Cuando llega a 0, avisa al GameManager para que canbie de escena
 public class GameTimer : MonoBehaviourPunCallbacks
 {
     // Claves en las Room Properties
     public const string ROOM_KEY_START = "matchStartTime";  // instante de arranque (PhotonNetwork.Time)
-    public const string ROOM_KEY_DURATION = "matchDuration"; // duraciÛn total en segundos
+    public const string ROOM_KEY_DURATION = "matchDuration"; // duraci√≥n total en segundos
 
     // Dependencias inyectadas desde GameManager
     private IMatchClock clock;      // fuente de tiempo (PhotonMatchClock)
     private ITimeDisplay display;   // UI que muestra el tiempo (TimerTextPresenter)
-    private IGameEndHandler endHandler; // quiÈn se entera cuando termina (GameManager)
+    private IGameEndHandler endHandler; // qui√©n se entera cuando termina (GameManager)
 
     // Estado del timer
     private double startTime;    
@@ -40,7 +40,7 @@ public class GameTimer : MonoBehaviourPunCallbacks
         this.display = display;
         this.endHandler = endHandler;
 
-        // El Master escribe las propiedades de inicio/duraciÛn si a˙n no existen
+        // El Master escribe las propiedades de inicio/duraci√≥n si a√∫n no existen
         if (PhotonNetwork.IsMasterClient)
         {
             var roomProps = PhotonNetwork.CurrentRoom?.CustomProperties;
@@ -55,16 +55,16 @@ public class GameTimer : MonoBehaviourPunCallbacks
                 PhotonNetwork.CurrentRoom.SetCustomProperties(set);
         }
 
-        // Intentamos leer de inmediato; si todavÌa no llegaron, escuchamos OnRoomPropertiesUpdate
+        // Intentamos leer de inmediato; si todav√≠a no llegaron, escuchamos OnRoomPropertiesUpdate
         TryReadRoomProps(out initialized);
     }
 
     private void Update()
     {
-        // No hacemos nada hasta tener datos v·lidos o si ya terminÛ
+        // No hacemos nada hasta tener datos v√°lidos o si ya termin√≥
         if (!initialized || finished || clock == null) return;
 
-        // C·lculo del tiempo restante con reloj global de Photon
+        // C√°lculo del tiempo restante con reloj global de Photon
         double now = clock.Now;
         double endTime = startTime + durationSec;
         double remaining = endTime - now;
@@ -77,7 +77,7 @@ public class GameTimer : MonoBehaviourPunCallbacks
         {
             finished = true;
             
-            endHandler?.OnMatchTimeEnded(); // El GameManager (si es Master) har· el LoadLevel
+            endHandler?.OnMatchTimeEnded(); // El GameManager (si es Master) har√° el LoadLevel
         }
     }
 
