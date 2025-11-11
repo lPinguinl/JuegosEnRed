@@ -35,34 +35,43 @@ public class StunHandler : MonoBehaviourPun
         if (!photonView.IsMine) return;
 
         Ray ray = new Ray(transform.position, transform.forward);
-        RaycastHit hit;
-        
-        if (Physics.Raycast(ray, out hit, attackRange))
+        if (Physics.Raycast(ray, out RaycastHit hit, attackRange))
         {
-            // En lugar de buscar un Tag, buscamos la interfaz IStunable.
             IStunable stunable = hit.collider.GetComponent<IStunable>();
-            if (stunable != null && stunable.IsStunned() == false) // <-- Agregamos una verificación para evitar stun repetidos
-            {
-                PhotonView targetPV = hit.collider.GetComponent<PhotonView>();
-                if (targetPV != null)
-                {
-                    // Llamamos al RPC de stun en el otro jugador, pasando nuestra posición.
-                    targetPV.RPC("RPC_OnStunned", RpcTarget.All, transform.position);
+            if (stunable == null) return;
 
-                    // --- Lógica de transferencia de corona ---
-                    // Solo si el target es el portador de la corona, pedir transferencia
-                    if (PhotonNetwork.CurrentRoom != null && PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey("CrownOwner"))
-                    {
-                        int crownOwner = (int)PhotonNetwork.CurrentRoom.CustomProperties["CrownOwner"];
-                        if (targetPV.Owner.ActorNumber == crownOwner)
-                        {
-                            // Pedir al MasterClient que transfiera la corona a este jugador (el atacante)
-                            photonView.RPC("RequestCrownTransfer", RpcTarget.MasterClient, PhotonNetwork.LocalPlayer.ActorNumber);
-                        }
-                    }
+            PhotonView targetPV = hit.collider.GetComponent<PhotonView>();
+            if (targetPV == null) return;
+
+            // Enviar stun al target incluyendo mi actorNumber
+            targetPV.RPC("RPC_OnStunned", RpcTarget.All, transform.position, PhotonNetwork.LocalPlayer.ActorNumber);
+
+            // Esperar un frame para recibir la notificación del target
+            StartCoroutine(AfterHitCheckAndMaybeTransferCrown(targetPV));
+        }
+    }
+
+    private System.Collections.IEnumerator AfterHitCheckAndMaybeTransferCrown(PhotonView targetPV)
+    {
+        // Esperar el siguiente frame para permitir que llegue RPC_NotifyHitResultToAttacker
+        yield return null;
+
+        bool? stunApplied = HitResultNotifier.Consume();
+
+        if (stunApplied == true)
+        {
+            // Solo si el stun se aplicó realmente
+            if (PhotonNetwork.CurrentRoom != null && PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey("CrownOwner"))
+            {
+                int crownOwner = (int)PhotonNetwork.CurrentRoom.CustomProperties["CrownOwner"];
+                if (targetPV.Owner.ActorNumber == crownOwner)
+                {
+                    // Pedir al MasterClient que transfiera la corona a este jugador (el atacante)
+                    photonView.RPC("RequestCrownTransfer", RpcTarget.MasterClient, PhotonNetwork.LocalPlayer.ActorNumber);
                 }
             }
         }
+        // Si stunApplied es false o null, no transferimos la corona.
     }
     
     [PunRPC]

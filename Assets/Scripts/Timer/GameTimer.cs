@@ -95,8 +95,8 @@ public class GameTimer : MonoBehaviourPunCallbacks
         }
 
         // Log cada ~1s para diagnóstico
-        if (Time.frameCount % 60 == 0)
-            Debug.Log($"[GameTimer] remaining={remaining:F2} now={now:F2} end={endTime:F2}");
+        /*if (Time.frameCount % 60 == 0)
+            Debug.Log($"[GameTimer] remaining={remaining:F2} now={now:F2} end={endTime:F2}");*/
     }
 
     public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)

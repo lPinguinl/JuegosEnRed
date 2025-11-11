@@ -44,6 +44,10 @@ MonoBehaviour:
   - RequestCrownTransfer
   - RPC_OnPickedUp
   - RPC_AnnounceCrownWinner
+  - RPC_ActivateSpeedBoost
+  - RPC_DeactivateSpeedBoost
+  - RPC_SetShield
+  - RPC_NotifyHitResultToAttacker
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 1
