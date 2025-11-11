@@ -53,6 +53,9 @@ public class GrenadeThrower : MonoBehaviourPun
         // Opción A: Instantiate (owned) para proyectil con OnCollision local que RPC-stunea a todos
         GameObject go = PhotonNetwork.Instantiate(grenadePrefab.name, throwOrigin.position, throwOrigin.rotation, 0);
         var grenade = go.GetComponent<Grenade>();
+        grenade.Init(PhotonNetwork.LocalPlayer.ActorNumber);
+        
+        grenade.Launch(throwForce, upwardModifier);
         if (grenade != null)
         {
             grenade.Init(PhotonNetwork.LocalPlayer.ActorNumber);

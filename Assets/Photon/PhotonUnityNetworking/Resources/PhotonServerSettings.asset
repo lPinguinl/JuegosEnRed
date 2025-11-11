@@ -50,6 +50,7 @@ MonoBehaviour:
   - RPC_NotifyHitResultToAttacker
   - RPC_SetHasGrenade
   - RPC_ConsumeGrenade
+  - RPC_ApplyLaunch
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 1
