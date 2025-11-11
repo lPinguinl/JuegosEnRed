@@ -4,7 +4,7 @@ using UnityEngine;
 [RequireComponent(typeof(Collider))]
 public abstract class PowerUpBase : MonoBehaviourPun, IPowerUp
 {
-    private bool collected;
+    protected bool collected;
 
     protected virtual void Awake()
     {
