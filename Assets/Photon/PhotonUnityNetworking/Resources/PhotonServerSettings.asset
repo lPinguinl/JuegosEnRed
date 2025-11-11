@@ -48,6 +48,8 @@ MonoBehaviour:
   - RPC_DeactivateSpeedBoost
   - RPC_SetShield
   - RPC_NotifyHitResultToAttacker
+  - RPC_SetHasGrenade
+  - RPC_ConsumeGrenade
   DisableAutoOpenWizard: 1
   ShowSettings: 0
   DevRegionSetOnce: 1

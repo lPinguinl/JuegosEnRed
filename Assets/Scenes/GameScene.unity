@@ -6332,11 +6332,15 @@ MonoBehaviour:
   - prefab: {fileID: 4972375654121666897, guid: baacb0a41217e6e458deed40dd210a89, type: 3}
     weight: 1
     maxSimultaneousOfThisType: 2
-    prefabName: SpeedPUp
+    prefabName: SpeedBoostPowerUp
   - prefab: {fileID: 3643187460291694196, guid: 15ac9183f8893c7429932c0bf72cb430, type: 3}
     weight: 1
     maxSimultaneousOfThisType: 1
-    prefabName: ShieldPUp
+    prefabName: ShieldPowerUp
+  - prefab: {fileID: 4972375654121666897, guid: 4a7f7e7e5b0a4d04e9614e6c8516aabd, type: 3}
+    weight: 1
+    maxSimultaneousOfThisType: 1
+    prefabName: GrenadePickup
   logSpawns: 0
 --- !u!1001 &555967754
 PrefabInstance:
@@ -7437,7 +7441,7 @@ MonoBehaviour:
   - {fileID: 828057276}
   gameTimer: {fileID: 1940002164}
   timerPresenter: {fileID: 950453089}
-  matchDurationSeconds: 20
+  matchDurationSeconds: 40
   resultScene: ResultScene
   stateManager: {fileID: 1219020415}
   preGameCountdownText: {fileID: 1874799870}

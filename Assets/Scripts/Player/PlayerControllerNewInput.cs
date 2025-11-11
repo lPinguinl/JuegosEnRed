@@ -38,6 +38,10 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
     [SerializeField] private bool isSpeedBoosted = false;
     [SerializeField] private float speedBoostMultiplier = 2.0f;
     private Coroutine speedBoostRoutine;
+    
+    [Header("Grenade")]
+    [SerializeField] private bool hasGrenade = false;
+    public bool HasGrenade => hasGrenade;
 
     private void Awake()
     {
@@ -384,6 +388,12 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
         yield return new WaitForSeconds(duration);
         // Al expirar, apagar en todos
         photonView.RPC(nameof(RPC_DeactivateSpeedBoost), RpcTarget.All);
+    }
+    
+    [PunRPC]
+    private void RPC_SetHasGrenade(bool value)
+    {
+        hasGrenade = value;
     }
 }
 
