@@ -161,6 +161,9 @@ MonoBehaviour:
   groundCheckDistance: 1
   renderersToTint:
   - {fileID: 6822420418021499060}
+  hasShield: 0
+  isSpeedBoosted: 0
+  speedBoostMultiplier: 2
 --- !u!114 &674708247443687902
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -31,6 +31,13 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
 
     private InputAction crownClaimAction;           // Acción manual para la tecla E (Input System)
     private GameStateManager cachedStateManager;    // Referencia perezosa al gestor de estados
+    
+    [Header("PowerUp States")]
+    [SerializeField] private bool hasShield = false;
+
+    [SerializeField] private bool isSpeedBoosted = false;
+    [SerializeField] private float speedBoostMultiplier = 2.0f;
+    private Coroutine speedBoostRoutine;
 
     private void Awake()
     {
@@ -99,7 +106,8 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
             {
                 Vector3 move = new Vector3(moveInput.x, 0f, moveInput.y);
                 if (move.magnitude > 1f) move.Normalize();
-                Vector3 targetPos = rb.position + move * moveSpeed * Time.fixedDeltaTime;
+                float currentSpeed = isSpeedBoosted ? moveSpeed * speedBoostMultiplier : moveSpeed;
+                Vector3 targetPos = rb.position + move * currentSpeed * Time.fixedDeltaTime;
                 rb.MovePosition(targetPos);
 
                 if (move.sqrMagnitude > 0.001f)
@@ -180,12 +188,42 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
     }
 
     [PunRPC]
-    private void RPC_OnStunned(Vector3 attackerPosition)
+    private void RPC_OnStunned(Vector3 attackerPosition, int attackerActorNumber)
     {
-        if (isStunned) return;
+        // Si hay escudo, lo consumimos y evitamos el stun
+        if (hasShield)
+        {
+            photonView.RPC(nameof(RPC_SetShield), RpcTarget.All, false);
+
+            // Notificar al atacante que el golpe fue bloqueado
+            photonView.RPC(nameof(RPC_NotifyHitResultToAttacker), RpcTarget.All, attackerActorNumber, false);
+            return;
+        }
+
+        if (isStunned)
+        {
+            // Ya estaba stuneado: lo consideramos golpe no-aplicado para evitar dobles transferencias
+            photonView.RPC(nameof(RPC_NotifyHitResultToAttacker), RpcTarget.All, attackerActorNumber, false);
+            return;
+        }
 
         isStunned = true;
         StartCoroutine(StunCoroutine(attackerPosition));
+
+        // Notificar golpe aplicado
+        photonView.RPC(nameof(RPC_NotifyHitResultToAttacker), RpcTarget.All, attackerActorNumber, true);
+    }
+    
+    [PunRPC]
+    private void RPC_NotifyHitResultToAttacker(int attackerActorNumber, bool stunApplied)
+    {
+        // Solo el atacante procesa esta notificación (por actorNumber)
+        if (PhotonNetwork.LocalPlayer == null || PhotonNetwork.LocalPlayer.ActorNumber != attackerActorNumber)
+            return;
+
+        // Guardamos resultado en un pequeño buffer estático/servicio o invocamos un callback local.
+        // Como este script corre en el target, usaremos un evento global o un servicio estático.
+        HitResultNotifier.Report(stunApplied);
     }
 
     private IEnumerator StunCoroutine(Vector3 attackerPosition)
@@ -307,5 +345,58 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
         {
             UpdateCrownVisual();
         }
+    }
+    
+    [PunRPC]
+    private void RPC_SetShield(bool active)
+    {
+        hasShield = active;
+        // Sin UI por ahora.
+    }
+
+    [PunRPC]
+    private void RPC_ActivateSpeedBoost(float multiplier, float duration)
+    {
+        if (isSpeedBoosted) return; // No acumulable
+        isSpeedBoosted = true;
+        speedBoostMultiplier = multiplier;
+
+        if (speedBoostRoutine != null) StopCoroutine(speedBoostRoutine);
+        speedBoostRoutine = StartCoroutine(SpeedBoostCoroutine(duration));
+    }
+
+    [PunRPC]
+    private void RPC_DeactivateSpeedBoost()
+    {
+        if (!isSpeedBoosted) return;
+
+        isSpeedBoosted = false;
+
+        if (speedBoostRoutine != null)
+        {
+            StopCoroutine(speedBoostRoutine);
+            speedBoostRoutine = null;
+        }
+    }
+
+    private System.Collections.IEnumerator SpeedBoostCoroutine(float duration)
+    {
+        yield return new WaitForSeconds(duration);
+        // Al expirar, apagar en todos
+        photonView.RPC(nameof(RPC_DeactivateSpeedBoost), RpcTarget.All);
+    }
+}
+
+//Clase estatica para notificar si el stun fue efectivo o no y decidir sobre la transferencia de la corona
+public static class HitResultNotifier
+{
+    private static bool? lastResult;
+
+    public static void Report(bool stunApplied) => lastResult = stunApplied;
+    public static bool? Consume()
+    {
+        var r = lastResult;
+        lastResult = null;
+        return r;
     }
 }
