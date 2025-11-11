@@ -1,8 +1,7 @@
 using UnityEngine;
 using Photon.Pun;
 using ExitGames.Client.Photon;
-using System.Collections;
-using System.Diagnostics;
+using System.Linq; // para loguear keys cambiadas
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 // Interfaz: el GameManager implementa esto para enterarse cuando el tiempo llega a 0
@@ -11,86 +10,114 @@ public interface IGameEndHandler
     void OnMatchTimeEnded();
 }
 
-
-// Usa Room Custom Properties para guardar el inicio y la duración
-// Usa el reloj global de Photon (PhotonNetwork.Time) para que todos cuenten igual
-// Cuando llega a 0, avisa al GameManager para que canbie de escena
+/// <summary>
+/// Timer de partida sincronizado por Photon.
+/// - Master: establece Room Props "matchStartTime" (double) y "matchDuration" (double) si no existen.
+/// - Todos: leen esas props y cuentan con PhotonNetwork.Time.
+/// - Al llegar a 0, invoca OnMatchTimeEnded() en GameManager (solo el Master cambia de escena).
+/// </summary>
 public class GameTimer : MonoBehaviourPunCallbacks
 {
-    // Claves en las Room Properties
-    public const string ROOM_KEY_START = "matchStartTime";  // instante de arranque (PhotonNetwork.Time)
-    public const string ROOM_KEY_DURATION = "matchDuration"; // duración total en segundos
+    public const string ROOM_KEY_START    = "matchStartTime";
+    public const string ROOM_KEY_DURATION = "matchDuration";
 
-    // Dependencias inyectadas desde GameManager
-    private IMatchClock clock;      // fuente de tiempo (PhotonMatchClock)
-    private ITimeDisplay display;   // UI que muestra el tiempo (TimerTextPresenter)
-    private IGameEndHandler endHandler; // quién se entera cuando termina (GameManager)
+    private IMatchClock clock;         // Fuente de tiempo global
+    private ITimeDisplay display;      // UI (TimerTextPresenter)
+    private IGameEndHandler endHandler;
 
-    // Estado del timer
-    private double startTime;    
-    private double durationSec; 
-    private bool initialized = false; 
-    private bool finished = false;    
+    private double startTime;
+    private double durationSec;
+    private bool initialized = false;
+    private bool finished = false;
 
-    // Llamado por GameManager al comenzar la escena de juego
-    // Crea/asegura las Room Properties (solo el Master) y luego las lee en todos.
+    // Llamado normalmente por GameManager al entrar en InGame (ideal).
     public void Initialize(IMatchClock clock, ITimeDisplay display, IGameEndHandler endHandler, double defaultDurationSec)
     {
         this.clock = clock;
         this.display = display;
         this.endHandler = endHandler;
 
-        // El Master escribe las propiedades de inicio/duración si aún no existen
+        // PHOTON (Master): crear props si faltan
         if (PhotonNetwork.IsMasterClient)
         {
             var roomProps = PhotonNetwork.CurrentRoom?.CustomProperties;
             bool hasStart = roomProps != null && roomProps.ContainsKey(ROOM_KEY_START);
-            bool hasDur = roomProps != null && roomProps.ContainsKey(ROOM_KEY_DURATION);
+            bool hasDur   = roomProps != null && roomProps.ContainsKey(ROOM_KEY_DURATION);
 
-            Hashtable set = new Hashtable();
-            if (!hasStart) set[ROOM_KEY_START] = PhotonNetwork.Time;     // arrancar ahora
-            if (!hasDur) set[ROOM_KEY_DURATION] = defaultDurationSec;
+            var set = new Hashtable();
+            if (!hasStart) set[ROOM_KEY_START] = PhotonNetwork.Time;
+            if (!hasDur)   set[ROOM_KEY_DURATION] = defaultDurationSec;
 
             if (set.Count > 0)
+            {
+                Debug.Log($"[GameTimer] Master set props. startNow={set.ContainsKey(ROOM_KEY_START)} durSet={set.ContainsKey(ROOM_KEY_DURATION)}");
                 PhotonNetwork.CurrentRoom.SetCustomProperties(set);
+            }
         }
 
-        // Intentamos leer de inmediato; si todavía no llegaron, escuchamos OnRoomPropertiesUpdate
+        // Intento de lectura inmediata; si no es posible, quedamos a la espera de OnRoomPropertiesUpdate
         TryReadRoomProps(out initialized);
+        Debug.Log($"[GameTimer] Initialize on {(PhotonNetwork.IsMasterClient ? "Master" : "Client")}. ok={initialized} start={startTime:F3} dur={durationSec:F1}");
+        if (initialized)
+        {
+            TryAutoBootstrap(); // por si falta algo
+        }
     }
 
     private void Update()
     {
-        // No hacemos nada hasta tener datos válidos o si ya terminó
+        // Si aún no nos “marcaron” como inicializados, volvemos a intentar leer props
+        if (!initialized && TryReadRoomProps(out initialized) && initialized)
+        {
+            Debug.Log("[GameTimer] Late init by polling props.");
+            TryAutoBootstrap();
+        }
+
+        // Auto-bootstrap suave: si el GameManager no llamó Initialize, nos aseguramos de tener reloj/handler
+        if (clock == null || endHandler == null)
+        {
+            TryAutoBootstrap();
+        }
+
         if (!initialized || finished || clock == null) return;
 
-        // Cálculo del tiempo restante con reloj global de Photon
         double now = clock.Now;
         double endTime = startTime + durationSec;
         double remaining = endTime - now;
 
-        // Actualizar UI
-        display?.SetTime(remaining);
+        // UI best-effort
+        try { display?.SetTime(remaining); } catch { /* ignorar errores de UI */ }
 
-        // Al llegar a 0, notificamos
         if (remaining <= 0.0 && !finished)
         {
             finished = true;
-            
-            endHandler?.OnMatchTimeEnded(); // El GameManager (si es Master) hará el LoadLevel
+            endHandler?.OnMatchTimeEnded();
         }
+
+        // Log cada ~1s para diagnóstico
+        if (Time.frameCount % 60 == 0)
+            Debug.Log($"[GameTimer] remaining={remaining:F2} now={now:F2} end={endTime:F2}");
     }
 
-    // Se llama cuando cambian propiedades de la sala (Room Custom Properties)
     public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
     {
         if (propertiesThatChanged == null) return;
 
+        // Debug: ver qué cambió
+        var keys = string.Join(",", propertiesThatChanged.Keys.Cast<object>());
+        Debug.Log($"[GameTimer] OnRoomPropertiesUpdate keys=[{keys}]");
+
         if (TryReadRoomProps(out bool ok) && ok)
-            initialized = true;
+        {
+            if (!initialized)
+            {
+                initialized = true;
+                Debug.Log($"[GameTimer] Inicializado desde Room Properties. start={startTime:F2} dur={durationSec:F2}");
+            }
+            TryAutoBootstrap(); // asegurar reloj/handler aunque el GM no nos haya inicializado
+        }
     }
 
-    // Lee start/duration desde las Room Properties
     private bool TryReadRoomProps(out bool ok)
     {
         ok = false;
@@ -99,11 +126,45 @@ public class GameTimer : MonoBehaviourPunCallbacks
 
         if (roomProps.ContainsKey(ROOM_KEY_START) && roomProps.ContainsKey(ROOM_KEY_DURATION))
         {
-            startTime = (double)roomProps[ROOM_KEY_START];
+            startTime   = (double)roomProps[ROOM_KEY_START];
             durationSec = (double)roomProps[ROOM_KEY_DURATION];
             ok = true;
             return true;
         }
         return false;
+    }
+
+    // Se llama cuando detectamos props válidas, para autonfigurarnos si el GM no lo hizo aún.
+    private void TryAutoBootstrap()
+    {
+        if (clock == null)
+        {
+            clock = new PhotonMatchClock(); // reloj global de Photon
+            Debug.Log("[GameTimer] Auto-bootstrap: clock = PhotonMatchClock");
+        }
+
+        if (endHandler == null)
+        {
+            // Normalmente el GameTimer está en el mismo GameObject que el GameManager
+            endHandler = GetComponentInParent<IGameEndHandler>();
+            if (endHandler == null)
+            {
+                var gm = FindObjectOfType<GameManager>();
+                if (gm != null) endHandler = gm;
+            }
+            if (endHandler != null)
+                Debug.Log("[GameTimer] Auto-bootstrap: endHandler asignado.");
+        }
+
+        if (display == null)
+        {
+            // La UI es opcional: si no está, el conteo igual corre y el Master terminará el match
+            var presenter = FindObjectOfType<TimerTextPresenter>(true);
+            if (presenter != null)
+            {
+                display = presenter;
+                Debug.Log("[GameTimer] Auto-bootstrap: display (TimerTextPresenter) asignado.");
+            }
+        }
     }
 }

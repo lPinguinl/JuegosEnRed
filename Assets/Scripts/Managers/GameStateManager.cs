@@ -8,7 +8,7 @@ using UnityEngine;
 /// <summary>
 /// Coordina el flujo de estados previos a la partida y decide quién obtiene la corona.
 /// Toda la sincronización ocurre a través de Room Custom Properties y RaiseEvent/RPC de Photon.
-/// </summary>
+///</summary>
 public class GameStateManager : MonoBehaviourPunCallbacks
 {
     public enum State
@@ -24,8 +24,8 @@ public class GameStateManager : MonoBehaviourPunCallbacks
     private const string RoomStateDurationKey = "MatchPreCountdownDuration";
     private const string CrownOwnerPropertyKey = "CrownOwner";
 
-    private const byte CrownAttemptEventCode = 38;            // Código del RaiseEvent para presiones de tecla E
-    private const double CrownAttemptToleranceSeconds = 0.05; // Pequeña tolerancia por latencia al evaluar quién fue “el último”
+    private const byte CrownAttemptEventCode = 38; // Código de RaiseEvent para presiones de tecla E
+    private const double CrownAttemptToleranceSeconds = 0.05; // Tolerancia por latencia (último en el dead-line)
 
     [SerializeField] private double preGameCountdownSeconds = 5.0;
 
@@ -33,6 +33,8 @@ public class GameStateManager : MonoBehaviourPunCallbacks
 
     private IMatchClock clock;
     private bool initialized;
+    private bool hasStateSnapshot;
+
     private State currentState = State.PreGameCountdown;
     private double stateStartTime;
     private double currentStateDuration;
@@ -50,12 +52,14 @@ public class GameStateManager : MonoBehaviourPunCallbacks
     private void OnEnable()
     {
         // Escuchamos los RaiseEvent que llegan desde clientes (código CrownAttemptEventCode)
-        PhotonNetwork.NetworkingClient.EventReceived += OnPhotonEvent;
+        if (PhotonNetwork.NetworkingClient != null)
+            PhotonNetwork.NetworkingClient.EventReceived += OnPhotonEvent;
     }
 
     private void OnDisable()
     {
-        PhotonNetwork.NetworkingClient.EventReceived -= OnPhotonEvent;
+        if (PhotonNetwork.NetworkingClient != null)
+            PhotonNetwork.NetworkingClient.EventReceived -= OnPhotonEvent;
     }
 
     /// <summary>
@@ -63,16 +67,13 @@ public class GameStateManager : MonoBehaviourPunCallbacks
     /// </summary>
     public void Initialize(IMatchClock sharedClock)
     {
-        if (initialized)
-        {
-            return;
-        }
+        if (initialized) return;
 
         clock = sharedClock ?? throw new ArgumentNullException(nameof(sharedClock));
 
         if (PhotonNetwork.CurrentRoom == null)
         {
-            Debug.LogError("[GameStateManager] No hay sala activa; no se puede sincronizar estados.");
+            Debug.LogError("[GSM] No hay sala activa; no se puede sincronizar estados.");
             return;
         }
 
@@ -80,19 +81,25 @@ public class GameStateManager : MonoBehaviourPunCallbacks
 
         if (PhotonNetwork.IsMasterClient)
         {
-            EnsureInitialState();
+            EnsureInitialState(); // Esto hace ApplyState()
+            hasStateSnapshot = true;
         }
         else
         {
-            ReadStateFromRoom();
+            hasStateSnapshot = TryReadStateFromRoom();
+            Debug.Log($"[GSM] Inicializado (Cliente). hasStateSnapshot={hasStateSnapshot}. Si es false, haré polling hasta que aparezcan las props.");
         }
     }
 
     private void Update()
-       {
-        if (!initialized || clock == null)
+    {
+        if (!initialized || clock == null) return;
+
+        // Fallback: si aún no tenemos snapshot, intentar leerlo cada frame
+        if (!hasStateSnapshot)
         {
-            return;
+            hasStateSnapshot = TryReadStateFromRoom();
+            if (!hasStateSnapshot) return; // todavía no puedo avanzar
         }
 
         if (currentState == State.PreGameCountdown)
@@ -106,10 +113,7 @@ public class GameStateManager : MonoBehaviourPunCallbacks
     /// </summary>
     public void ReportCrownAttempt(int actorNumber)
     {
-        if (!initialized || currentState != State.PreGameCountdown)
-        {
-            return;
-        }
+        if (!initialized || currentState != State.PreGameCountdown) return;
 
         double pressTime = clock.Now;
 
@@ -131,7 +135,7 @@ public class GameStateManager : MonoBehaviourPunCallbacks
     {
         var payload = new object[] { actorNumber, pressTime };
         var options = new RaiseEventOptions { Receivers = ReceiverGroup.MasterClient }; // Solo el Master necesita este dato
-        var sendOptions = new SendOptions { Reliability = true };                        // Confiable para no perder intentos
+        var sendOptions = new SendOptions { Reliability = true }; // Confiable para no perder intentos
 
         PhotonNetwork.RaiseEvent(CrownAttemptEventCode, payload, options, sendOptions);
     }
@@ -141,15 +145,9 @@ public class GameStateManager : MonoBehaviourPunCallbacks
     /// </summary>
     private void OnPhotonEvent(EventData photonEvent)
     {
-        if (!PhotonNetwork.IsMasterClient || photonEvent.Code != CrownAttemptEventCode)
-        {
-            return;
-        }
+        if (!PhotonNetwork.IsMasterClient || photonEvent.Code != CrownAttemptEventCode) return;
 
-        if (photonEvent.CustomData is not object[] payload || payload.Length != 2)
-        {
-            return;
-        }
+        if (photonEvent.CustomData is not object[] payload || payload.Length != 2) return;
 
         int actorNumber = (int)payload[0];
         double pressTime = (double)payload[1];
@@ -171,10 +169,7 @@ public class GameStateManager : MonoBehaviourPunCallbacks
     private void EnsureInitialState()
     {
         var room = PhotonNetwork.CurrentRoom;
-        if (room == null)
-        {
-            return;
-        }
+        if (room == null) return;
 
         var props = room.CustomProperties;
 
@@ -194,17 +189,14 @@ public class GameStateManager : MonoBehaviourPunCallbacks
         }
         else
         {
-            ReadStateFromRoom();
+            TryReadStateFromRoom();
         }
     }
 
     private void ChangeState(State nextState)
     {
         var room = PhotonNetwork.CurrentRoom;
-        if (room == null)
-        {
-            return;
-        }
+        if (room == null) return;
 
         double now = PhotonNetwork.Time;
 
@@ -238,6 +230,8 @@ public class GameStateManager : MonoBehaviourPunCallbacks
             lastPressByActor.Clear();
             preGameDeadline = stateStartTime + (duration > 0.0 ? duration : preGameCountdownSeconds);
         }
+
+        hasStateSnapshot = true;
 
         StateChanged?.Invoke(currentState);
 
@@ -301,11 +295,9 @@ public class GameStateManager : MonoBehaviourPunCallbacks
             double pressTime = kvp.Value;
 
             if (pressTime > preGameDeadline + CrownAttemptToleranceSeconds)
-            {
                 continue;
-            }
 
-            bool isBetter = pressTime > latestTime || (pressTime == latestTime && actor < winner);
+            bool isBetter = pressTime > latestTime || (pressTime == latestTime && (winner == -1 || actor < winner));
             if (isBetter)
             {
                 latestTime = pressTime;
@@ -319,18 +311,13 @@ public class GameStateManager : MonoBehaviourPunCallbacks
     private int GetLowestActorNumberInRoom()
     {
         var players = PhotonNetwork.PlayerList;
-        if (players == null || players.Length == 0)
-        {
-            return -1;
-        }
+        if (players == null || players.Length == 0) return -1;
 
         int lowest = int.MaxValue;
         foreach (var player in players)
         {
             if (player != null && player.ActorNumber < lowest)
-            {
                 lowest = player.ActorNumber;
-            }
         }
 
         return lowest == int.MaxValue ? -1 : lowest;
@@ -338,40 +325,40 @@ public class GameStateManager : MonoBehaviourPunCallbacks
 
     public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
     {
-        if (propertiesThatChanged == null)
-        {
-            return;
-        }
+        if (propertiesThatChanged == null) return;
+
+        var keys = string.Join(",", propertiesThatChanged.Keys);
+        Debug.Log($"[GSM] OnRoomPropertiesUpdate keys=[{keys}] Master={PhotonNetwork.IsMasterClient}");
 
         if (propertiesThatChanged.ContainsKey(RoomStateKey) || propertiesThatChanged.ContainsKey(RoomStateStartKey))
         {
-            ReadStateFromRoom();
+            hasStateSnapshot = TryReadStateFromRoom() || hasStateSnapshot;
         }
     }
 
-    private void ReadStateFromRoom()
+    private bool TryReadStateFromRoom()
     {
         var room = PhotonNetwork.CurrentRoom;
-        if (room == null)
-        {
-            return;
-        }
+        if (room == null) return false;
 
         var props = room.CustomProperties;
         if (!props.TryGetValue(RoomStateKey, out object stateValue) ||
             !props.TryGetValue(RoomStateStartKey, out object startValue))
         {
-            return;
+            return false;
         }
 
         State state = (State)(int)stateValue;
         double start = (double)startValue;
 
-        double duration = state == State.PreGameCountdown && props.TryGetValue(RoomStateDurationKey, out object durationValue)
+        double duration = state == State.PreGameCountdown &&
+                          props.TryGetValue(RoomStateDurationKey, out object durationValue)
             ? (double)durationValue
             : 0.0;
 
+        Debug.Log($"[GSM] ApplyState state={state} start={start:F3} duration={duration:F2} now={clock?.Now:F3}");
         ApplyState(state, start, duration);
+        return true;
     }
 
     [PunRPC]
