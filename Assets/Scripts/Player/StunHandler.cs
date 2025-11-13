@@ -1,12 +1,16 @@
 using UnityEngine;
 using Photon.Pun;
 using UnityEngine.InputSystem;
+using System.Collections;
 
 public class StunHandler : MonoBehaviourPun
 {
     [SerializeField] private float attackRange = 1f;
 
     private PlayerControls controls;
+
+    [Header("Animator")]
+    [SerializeField] private Animator pAnimator;
 
     private void Awake()
     {
@@ -33,6 +37,8 @@ public class StunHandler : MonoBehaviourPun
     private void TryStun()
     {
         if (!photonView.IsMine) return;
+
+
 
         Ray ray = new Ray(transform.position, transform.forward);
         if (Physics.Raycast(ray, out RaycastHit hit, attackRange))
@@ -84,5 +90,13 @@ public class StunHandler : MonoBehaviourPun
             { "CrownOwner", newOwnerActorNumber }
         };
         PhotonNetwork.CurrentRoom.SetCustomProperties(props);
+    }
+
+    private IEnumerator PunchAnimation(Animator animator) {
+
+        animator.SetBool("isPunching", true);
+        yield return new WaitForSeconds(1);
+        animator.SetBool("isPunching", false);
+
     }
 }

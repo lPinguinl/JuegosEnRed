@@ -167,6 +167,7 @@ MonoBehaviour:
   isSpeedBoosted: 0
   speedBoostMultiplier: 2
   hasGrenade: 0
+  pAnimator: {fileID: 1293413015248411213}
 --- !u!114 &674708247443687902
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -950,6 +951,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 60770bdb4dc667c45bea53db0339dc05, type: 3}
+--- !u!95 &1293413015248411213 stripped
+Animator:
+  m_CorrespondingSourceObject: {fileID: 4540229000190281644, guid: 60770bdb4dc667c45bea53db0339dc05, type: 3}
+  m_PrefabInstance: {fileID: 3382487478060146145}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &4397690985945035560 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1438546959266459337, guid: 60770bdb4dc667c45bea53db0339dc05, type: 3}

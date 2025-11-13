@@ -41,6 +41,10 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
     
     [Header("Grenade")]
     [SerializeField] private bool hasGrenade = false;
+
+    [Header("Animator")]
+    [SerializeField] private Animator pAnimator;
+
     public bool HasGrenade => hasGrenade;
 
     private void Awake()
@@ -119,6 +123,12 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
                     Quaternion targetRot = Quaternion.LookRotation(move);
                     rb.MoveRotation(Quaternion.Slerp(rb.rotation, targetRot, 10f * Time.fixedDeltaTime));
                 }
+
+                if (move != Vector3.zero)
+                {
+                    pAnimator.SetBool("isRunning", true);
+                }
+                else pAnimator.SetBool("isRunning", false);
             }
         }
         else
