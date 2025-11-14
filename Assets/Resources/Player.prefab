@@ -194,6 +194,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   attackRange: 1
+  pAnimator: {fileID: 1293413015248411213}
 --- !u!114 &7890188591691658116
 MonoBehaviour:
   m_ObjectHideFlags: 0

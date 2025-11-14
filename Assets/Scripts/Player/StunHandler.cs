@@ -16,29 +16,45 @@ public class StunHandler : MonoBehaviourPun
     {
         controls = new PlayerControls();
     }
-    
+
     private void OnEnable()
     {
-        if (photonView.IsMine)
-        {
-            controls.Player.Attack.performed += ctx => TryStun();
-            controls.Player.Attack.Enable();
-        }
+        if (!photonView.IsMine) return;
+
+        if (controls == null)
+            controls = new PlayerControls();
+
+        controls.Player.Attack.performed += OnAttackInput;
+        controls.Enable();
     }
 
     private void OnDisable()
     {
-        if (photonView.IsMine)
-        {
-            controls.Player.Attack.Disable();
-        }
+        if (!photonView.IsMine) return;
+
+        controls.Player.Attack.performed -= OnAttackInput;
+        controls.Disable();
+    }
+
+    private void OnAttackInput(InputAction.CallbackContext ctx)
+    {
+        // Sincronizar animación con todos los clientes
+        photonView.RPC("RPC_PlayPunchAnimation", RpcTarget.All);
+
+        // Lógica de stun
+        TryStun();
+    }
+
+    [PunRPC]
+    private void RPC_PlayPunchAnimation()
+    {
+        if (pAnimator == null) return;
+        StartCoroutine(PunchAnimation(pAnimator));
     }
 
     private void TryStun()
     {
         if (!photonView.IsMine) return;
-
-
 
         Ray ray = new Ray(transform.position, transform.forward);
         if (Physics.Raycast(ray, out RaycastHit hit, attackRange))
@@ -57,7 +73,7 @@ public class StunHandler : MonoBehaviourPun
         }
     }
 
-    private System.Collections.IEnumerator AfterHitCheckAndMaybeTransferCrown(PhotonView targetPV)
+    private IEnumerator AfterHitCheckAndMaybeTransferCrown(PhotonView targetPV)
     {
         // Esperar el siguiente frame para permitir que llegue RPC_NotifyHitResultToAttacker
         yield return null;
@@ -79,7 +95,7 @@ public class StunHandler : MonoBehaviourPun
         }
         // Si stunApplied es false o null, no transferimos la corona.
     }
-    
+
     [PunRPC]
     public void RequestCrownTransfer(int newOwnerActorNumber)
     {
@@ -92,11 +108,10 @@ public class StunHandler : MonoBehaviourPun
         PhotonNetwork.CurrentRoom.SetCustomProperties(props);
     }
 
-    private IEnumerator PunchAnimation(Animator animator) {
-
+    private IEnumerator PunchAnimation(Animator animator)
+    {
         animator.SetBool("isPunching", true);
-        yield return new WaitForSeconds(1);
+        yield return new WaitForSeconds(1f);
         animator.SetBool("isPunching", false);
-
     }
 }
