@@ -10,46 +10,50 @@ public class StunHandler : MonoBehaviourPun
     private PlayerControls controls;
 
     [Header("Animator")]
-    [SerializeField] private Animator pAnimator;
+    [SerializeField] private Animator pAnimator; // opcional, ya no se usa directamente para sync
+
+    // Referencia al controlador principal del player
+    private PlayerControllerNewInput playerController;
 
     private void Awake()
     {
         controls = new PlayerControls();
+        playerController = GetComponent<PlayerControllerNewInput>();
     }
-
+    
     private void OnEnable()
     {
-        if (!photonView.IsMine) return;
+        if (photonView.IsMine)
+        {
+            if (controls == null)
+                controls = new PlayerControls();
 
-        if (controls == null)
-            controls = new PlayerControls();
-
-        controls.Player.Attack.performed += OnAttackInput;
-        controls.Enable();
+            controls.Player.Attack.performed += OnAttackInput;
+            controls.Player.Attack.Enable();
+        }
     }
 
     private void OnDisable()
     {
-        if (!photonView.IsMine) return;
-
-        controls.Player.Attack.performed -= OnAttackInput;
-        controls.Disable();
+        if (photonView.IsMine)
+        {
+            controls.Player.Attack.performed -= OnAttackInput;
+            controls.Player.Attack.Disable();
+        }
     }
 
     private void OnAttackInput(InputAction.CallbackContext ctx)
     {
-        // Sincronizar animación con todos los clientes
-        photonView.RPC("RPC_PlayPunchAnimation", RpcTarget.All);
+        if (!photonView.IsMine) return;
 
-        // Lógica de stun
+        // 1) Disparar animación de punch a través del PlayerController
+        if (playerController != null)
+        {
+            playerController.StartPunch();
+        }
+
+        // 2) Lógica de stun (raycast + RPCs de gameplay)
         TryStun();
-    }
-
-    [PunRPC]
-    private void RPC_PlayPunchAnimation()
-    {
-        if (pAnimator == null) return;
-        StartCoroutine(PunchAnimation(pAnimator));
     }
 
     private void TryStun()
@@ -95,7 +99,7 @@ public class StunHandler : MonoBehaviourPun
         }
         // Si stunApplied es false o null, no transferimos la corona.
     }
-
+    
     [PunRPC]
     public void RequestCrownTransfer(int newOwnerActorNumber)
     {
@@ -108,10 +112,5 @@ public class StunHandler : MonoBehaviourPun
         PhotonNetwork.CurrentRoom.SetCustomProperties(props);
     }
 
-    private IEnumerator PunchAnimation(Animator animator)
-    {
-        animator.SetBool("isPunching", true);
-        yield return new WaitForSeconds(1f);
-        animator.SetBool("isPunching", false);
-    }
+    
 }

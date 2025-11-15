@@ -29,7 +29,7 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
 
     private const string COLOR_KEY = "playerColorIdx";
 
-    private InputAction crownClaimAction;           // Acción manual para la tecla E (Input System)
+    private InputAction crownClaimAction;    // Acción manual para la tecla E (Input System)
     private GameStateManager cachedStateManager;    // Referencia perezosa al gestor de estados
     
     [Header("PowerUp States")]
@@ -44,6 +44,13 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
 
     [Header("Animator")]
     [SerializeField] private Animator pAnimator;
+
+    // === ESTADOS DE ANIMACIÓN SINCRONIZADOS ===
+    // Se sincronizan via OnPhotonSerializeView, no por RPC.
+    private bool isRunning;
+    private bool isPunching;
+    [SerializeField] private float punchDuration = 0.5f;
+    private float punchTimer;
 
     public bool HasGrenade => hasGrenade;
 
@@ -124,17 +131,37 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
                     rb.MoveRotation(Quaternion.Slerp(rb.rotation, targetRot, 10f * Time.fixedDeltaTime));
                 }
 
-                if (move != Vector3.zero)
+                // === LÓGICA DE CORRER (DUEÑO) ===
+                isRunning = (move != Vector3.zero);
+            }
+            else
+            {
+                // Si no puede moverse, no corre.
+                isRunning = false;
+            }
+
+            // === LÓGICA DE PUNCH (DUEÑO) ===
+            if (isPunching)
+            {
+                punchTimer -= Time.fixedDeltaTime;
+                if (punchTimer <= 0f)
                 {
-                    pAnimator.SetBool("isRunning", true);
+                    isPunching = false;
                 }
-                else pAnimator.SetBool("isRunning", false);
             }
         }
         else
         {
+            // Interpolación de red
             transform.position = Vector3.Lerp(transform.position, networkPosition, 10f * Time.fixedDeltaTime);
             transform.rotation = Quaternion.Slerp(transform.rotation, networkRotation, 10f * Time.fixedDeltaTime);
+        }
+
+        // === APLICAR ANIMACIONES EN TODOS LOS CLIENTES ===
+        if (pAnimator != null)
+        {
+            pAnimator.SetBool("isRunning", isRunning);
+            pAnimator.SetBool("isPunching", isPunching);
         }
 
         UpdateCrownVisual();
@@ -236,7 +263,6 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
             return;
 
         // Guardamos resultado en un pequeño buffer estático/servicio o invocamos un callback local.
-        // Como este script corre en el target, usaremos un evento global o un servicio estático.
         HitResultNotifier.Report(stunApplied);
     }
 
@@ -262,20 +288,40 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
         return isStunned;
     }
 
+    // === SINCRONIZACIÓN DE ESTADO POR RED (INCLUYENDO ANIMACIONES) ===
     public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
     {
         if (stream.IsWriting)
         {
+            // Datos del dueño hacia la red
             stream.SendNext(rb.position);
             stream.SendNext(rb.rotation);
             stream.SendNext(isStunned);
+
+            // Animaciones
+            stream.SendNext(isRunning);
+            stream.SendNext(isPunching);
         }
         else
         {
+            // Datos recibidos desde la red
             networkPosition = (Vector3)stream.ReceiveNext();
             networkRotation = (Quaternion)stream.ReceiveNext();
             isStunned = (bool)stream.ReceiveNext();
+
+            // Animaciones
+            isRunning = (bool)stream.ReceiveNext();
+            isPunching = (bool)stream.ReceiveNext();
         }
+    }
+
+    // === MÉTODO PARA INICIAR EL PUNCH (LO LLAMA StunHandler SOLO EN EL DUEÑO) ===
+    public void StartPunch()
+    {
+        if (!photonView.IsMine) return;
+
+        isPunching = true;
+        punchTimer = punchDuration;
     }
 
     private void ApplyColorFromProperties()

@@ -168,6 +168,7 @@ MonoBehaviour:
   speedBoostMultiplier: 2
   hasGrenade: 0
   pAnimator: {fileID: 1293413015248411213}
+  punchDuration: 0.5
 --- !u!114 &674708247443687902
 MonoBehaviour:
   m_ObjectHideFlags: 0
