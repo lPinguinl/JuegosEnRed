@@ -1,6 +1,7 @@
 using UnityEngine;
 using Photon.Pun;
 using UnityEngine.InputSystem;
+using System.Collections;
 
 public class StunHandler : MonoBehaviourPun
 {
@@ -8,16 +9,26 @@ public class StunHandler : MonoBehaviourPun
 
     private PlayerControls controls;
 
+    [Header("Animator")]
+    [SerializeField] private Animator pAnimator; // opcional, ya no se usa directamente para sync
+
+    // Referencia al controlador principal del player
+    private PlayerControllerNewInput playerController;
+
     private void Awake()
     {
         controls = new PlayerControls();
+        playerController = GetComponent<PlayerControllerNewInput>();
     }
     
     private void OnEnable()
     {
         if (photonView.IsMine)
         {
-            controls.Player.Attack.performed += ctx => TryStun();
+            if (controls == null)
+                controls = new PlayerControls();
+
+            controls.Player.Attack.performed += OnAttackInput;
             controls.Player.Attack.Enable();
         }
     }
@@ -26,8 +37,23 @@ public class StunHandler : MonoBehaviourPun
     {
         if (photonView.IsMine)
         {
+            controls.Player.Attack.performed -= OnAttackInput;
             controls.Player.Attack.Disable();
         }
+    }
+
+    private void OnAttackInput(InputAction.CallbackContext ctx)
+    {
+        if (!photonView.IsMine) return;
+
+        // 1) Disparar animación de punch a través del PlayerController
+        if (playerController != null)
+        {
+            playerController.StartPunch();
+        }
+
+        // 2) Lógica de stun (raycast + RPCs de gameplay)
+        TryStun();
     }
 
     private void TryStun()
@@ -51,7 +77,7 @@ public class StunHandler : MonoBehaviourPun
         }
     }
 
-    private System.Collections.IEnumerator AfterHitCheckAndMaybeTransferCrown(PhotonView targetPV)
+    private IEnumerator AfterHitCheckAndMaybeTransferCrown(PhotonView targetPV)
     {
         // Esperar el siguiente frame para permitir que llegue RPC_NotifyHitResultToAttacker
         yield return null;
@@ -85,4 +111,6 @@ public class StunHandler : MonoBehaviourPun
         };
         PhotonNetwork.CurrentRoom.SetCustomProperties(props);
     }
+
+    
 }
