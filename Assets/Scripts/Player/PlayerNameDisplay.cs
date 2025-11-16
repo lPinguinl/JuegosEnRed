@@ -1,8 +1,10 @@
 using UnityEngine;
 using TMPro;
 using Photon.Pun;
+using Photon.Realtime;
+using ExitGames.Client.Photon;
 
-public class PlayerNameDisplay : MonoBehaviour
+public class PlayerNameDisplay : MonoBehaviourPunCallbacks
 {
     // Asigna este campo en el Inspector a tu TextMeshPro
     [SerializeField] private TMP_Text nameText;
@@ -10,19 +12,78 @@ public class PlayerNameDisplay : MonoBehaviour
     // Este PhotonView es para saber a qué jugador pertenece este objeto
     private PhotonView photonView;
 
-    void Awake()
+    private void Awake()
     {
-        photonView = GetComponent<PhotonView>();
-        
+        photonView = GetComponentInParent<PhotonView>();
+
+        if (nameText == null)
+        {
+            Debug.LogWarning("[PlayerNameDisplay] nameText no asignado.");
+        }
+    }
+
+    private void OnEnable()
+    {
+        Refresh();
+    }
+
+    private void Start()
+    {
+        Refresh();
+    }
+
+    private void Refresh()
+    {
+        if (photonView == null)
+        {
+            return;
+        }
+
+        ApplyName();
+        ApplyColor();
+    }
+
+    private void ApplyName()
+    {
+        if (nameText == null)
+        {
+            return;
+        }
+
         if (photonView.IsMine)
         {
-            // Si este es mi jugador, obtengo mi nombre de la red
-            nameText.text = PhotonNetwork.LocalPlayer.NickName;
+            nameText.text = PhotonNetwork.LocalPlayer?.NickName ?? "";
         }
-        else
+        else if (photonView.Owner != null)
         {
-            // Si es el jugador de otro, obtengo su nombre de la red
             nameText.text = photonView.Owner.NickName;
+        }
+    }
+
+    private void ApplyColor()
+    {
+        if (nameText == null || photonView.Owner == null)
+        {
+            return;
+        }
+
+        if (photonView.Owner.CustomProperties.TryGetValue(LobbyManager.COLOR_KEY, out object idxObj) &&
+            idxObj is int colorIdx)
+        {
+            nameText.color = LobbyManager.GetPaletteColor(colorIdx);
+        }
+    }
+
+    public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
+    {
+        if (photonView == null || targetPlayer != photonView.Owner)
+        {
+            return;
+        }
+
+        if (changedProps.ContainsKey(LobbyManager.COLOR_KEY))
+        {
+            ApplyColor();
         }
     }
 }
