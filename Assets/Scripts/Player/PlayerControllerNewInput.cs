@@ -39,6 +39,11 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
     [SerializeField] private float speedBoostMultiplier = 2.0f;
     private Coroutine speedBoostRoutine;
     
+    [Header("PowerUp UI")]
+    [SerializeField] private GameObject shieldIconUI;
+    [SerializeField] private GameObject speedIconUI;
+    [SerializeField] private GameObject grenadeIconUI;
+    
     [Header("Grenade")]
     [SerializeField] private bool hasGrenade = false;
 
@@ -407,37 +412,45 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
         }
     }
     
+    
     [PunRPC]
     private void RPC_SetShield(bool active)
     {
         hasShield = active;
-        // Sin UI por ahora.
+
+        if (shieldIconUI != null)
+            shieldIconUI.SetActive(active);
     }
 
     [PunRPC]
     private void RPC_ActivateSpeedBoost(float multiplier, float duration)
     {
-        if (isSpeedBoosted) return; // No acumulable
+        if (isSpeedBoosted) return;
+
         isSpeedBoosted = true;
         speedBoostMultiplier = multiplier;
 
-        if (speedBoostRoutine != null) StopCoroutine(speedBoostRoutine);
+        if (speedIconUI != null)
+            speedIconUI.SetActive(true);
+
+        if (speedBoostRoutine != null)
+            StopCoroutine(speedBoostRoutine);
+
         speedBoostRoutine = StartCoroutine(SpeedBoostCoroutine(duration));
     }
 
     [PunRPC]
     private void RPC_DeactivateSpeedBoost()
     {
-        if (!isSpeedBoosted) return;
-
         isSpeedBoosted = false;
 
+        if (speedIconUI != null)
+            speedIconUI.SetActive(false);
+
         if (speedBoostRoutine != null)
-        {
             StopCoroutine(speedBoostRoutine);
-            speedBoostRoutine = null;
-        }
     }
+
 
     private System.Collections.IEnumerator SpeedBoostCoroutine(float duration)
     {
@@ -450,7 +463,11 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
     private void RPC_SetHasGrenade(bool value)
     {
         hasGrenade = value;
+
+        if (grenadeIconUI != null)
+            grenadeIconUI.SetActive(value);
     }
+
 }
 
 //Clase estatica para notificar si el stun fue efectivo o no y decidir sobre la transferencia de la corona
