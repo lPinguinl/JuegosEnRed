@@ -28,6 +28,8 @@ public class GameStateManager : MonoBehaviourPunCallbacks
     private const double CrownAttemptToleranceSeconds = 0.05; // Tolerancia por latencia (último en el dead-line)
 
     [SerializeField] private double preGameCountdownSeconds = 5.0;
+    [Header("UI Crown Hint")]
+    [SerializeField] private TMPro.TMP_Text crownHintText;
 
     private readonly Dictionary<int, double> lastPressByActor = new(); // ActorNumber ➜ último timestamp (PhotonNetwork.Time) de la tecla E
 
@@ -224,6 +226,13 @@ public class GameStateManager : MonoBehaviourPunCallbacks
         stateStartTime = startTime;
         currentStateDuration = duration;
         lastCountdownBroadcast = -1;
+        
+        // Mostrar/ocultar el texto de \"spammear E\" según el estado
+        if (crownHintText != null)
+        {
+            // Lo mostramos SOLO durante la pre-cuenta
+            crownHintText.gameObject.SetActive(newState == State.PreGameCountdown);
+        }
 
         if (newState == State.PreGameCountdown)
         {
