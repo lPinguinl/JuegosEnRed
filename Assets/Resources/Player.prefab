@@ -366,9 +366,6 @@ MonoBehaviour:
   hasShield: 0
   isSpeedBoosted: 0
   speedBoostMultiplier: 2
-  shieldIconUI: {fileID: 2399126405444733504}
-  speedIconUI: {fileID: 9109391147721708158}
-  grenadeIconUI: {fileID: 2151717518902053086}
   hasGrenade: 0
   pAnimator: {fileID: 1293413015248411213}
   punchDuration: 0.5
