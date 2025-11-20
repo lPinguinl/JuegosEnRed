@@ -46,6 +46,11 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
     [Header("Animator")]
     [SerializeField] private Animator pAnimator;
 
+    [Header("PowerUp UI")]
+    [SerializeField] private GameObject shieldIconUI;
+    [SerializeField] private GameObject speedIconUI;
+    [SerializeField] private GameObject grenadeIconUI;
+
     // === ESTADOS DE ANIMACIÓN LOCALES Y DE RED ===
     // Estos se envían/reciben en nuestros paquetes hechos a mano.
     private bool isRunning;
@@ -370,7 +375,9 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
     private void RPC_SetShield(bool active)
     {
         hasShield = active;
-        // Sin UI por ahora.
+
+        if (shieldIconUI != null)
+            shieldIconUI.SetActive(active);
     }
 
     [PunRPC]
@@ -379,6 +386,9 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
         if (isSpeedBoosted) return; // No acumulable
         isSpeedBoosted = true;
         speedBoostMultiplier = multiplier;
+
+        if (speedIconUI != null)
+            speedIconUI.SetActive(true);
 
         if (speedBoostRoutine != null) StopCoroutine(speedBoostRoutine);
         speedBoostRoutine = StartCoroutine(SpeedBoostCoroutine(duration));
@@ -390,6 +400,9 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
         if (!isSpeedBoosted) return;
 
         isSpeedBoosted = false;
+
+        if (speedIconUI != null)
+            speedIconUI.SetActive(false);
 
         if (speedBoostRoutine != null)
         {
@@ -409,6 +422,9 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
     private void RPC_SetHasGrenade(bool value)
     {
         hasGrenade = value;
+
+        if (grenadeIconUI != null)
+            grenadeIconUI.SetActive(value);
     }
 
     private void ApplyColorFromProperties()

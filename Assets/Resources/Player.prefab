@@ -48,7 +48,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &6256267316271414958
 Transform:
   m_ObjectHideFlags: 0
@@ -132,7 +132,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &2274332179300533458
 Transform:
   m_ObjectHideFlags: 0
@@ -215,7 +215,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &2708107421805958272
 Transform:
   m_ObjectHideFlags: 0
@@ -224,13 +224,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2524594249773955230}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 3.5, z: 0}
+  m_LocalPosition: {x: 0, y: 2.5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 4049781398566949446}
-  m_Father: {fileID: 4397690985945035560}
-  m_RootOrder: 3
+  m_Father: {fileID: 4693840884213351002}
+  m_RootOrder: 4
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &4693840884213351003
 GameObject:
@@ -272,6 +272,7 @@ Transform:
   - {fileID: 4589608179616632749}
   - {fileID: 4397690985945035560}
   - {fileID: 2241831042317357565}
+  - {fileID: 2708107421805958272}
   m_Father: {fileID: 0}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -367,6 +368,9 @@ MonoBehaviour:
   speedBoostMultiplier: 2
   hasGrenade: 0
   pAnimator: {fileID: 1293413015248411213}
+  shieldIconUI: {fileID: 2399126405444733504}
+  speedIconUI: {fileID: 9109391147721708158}
+  grenadeIconUI: {fileID: 2151717518902053086}
   punchDuration: 0.5
 --- !u!114 &674708247443687902
 MonoBehaviour:
@@ -759,7 +763,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &729596269780785174
 Transform:
   m_ObjectHideFlags: 0
