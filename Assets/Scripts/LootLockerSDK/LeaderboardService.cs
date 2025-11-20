@@ -4,7 +4,7 @@ using UnityEngine;
 public class LeaderboardService : MonoBehaviour
 {
     // Guardamos el total acumulado localmente
-    private const string LocalTotalKey = "ll_local_total_score";
+    private const string LocalTotalKey = "e580355f5c684ef4908f55eaf8d9fd43";
 
     // Envía un score absoluto al leaderboard
     public static void SubmitScore(int score, string leaderboardKey, System.Action<bool> onDone = null)

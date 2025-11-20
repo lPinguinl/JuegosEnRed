@@ -734,7 +734,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   leaderboardKey: e580355f5c684ef4908f55eaf8d9fd43
   count: 10
-  tableText: {fileID: 26305511}
+  tableText: {fileID: 1459675049}
 --- !u!114 &1340253770
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1241,8 +1241,9 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1758138633}
+  - component: {fileID: 1758138634}
   - component: {fileID: 1758138632}
+  - component: {fileID: 1758138633}
   m_Layer: 0
   m_Name: ResultsUploader
   m_TagString: Untagged
@@ -1264,18 +1265,31 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   leaderboardKey: e580355f5c684ef4908f55eaf8d9fd43
   scoreManager: {fileID: 0}
---- !u!4 &1758138633
-Transform:
+--- !u!222 &1758138633
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1758138631}
+  m_CullTransparentMesh: 1
+--- !u!224 &1758138634
+RectTransform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1758138631}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 908.986, y: 293.1016, z: 7.3535767}
+  m_LocalPosition: {x: 0, y: 0, z: 7.3535767}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 6
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 908.986, y: 293.1016}
+  m_SizeDelta: {x: 200, y: 50}
+  m_Pivot: {x: 0.5, y: 0.5}

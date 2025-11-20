@@ -24,8 +24,6 @@ MonoBehaviour:
   baseUrl: https://vddat9ha.api.lootlocker.com
   clientSideRequestTimeOut: 180
   logLevel: 2
-  prettifyJson: 1
-  obfuscateLogs: 1
   logErrorsAsWarnings: 0
   logInBuilds: 0
   allowTokenRefresh: 1
