@@ -157,8 +157,8 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
         else
         {
             // === INTERPOLACIÓN DE RED EN CLIENTES REMOTOS ===
-            transform.position = Vector3.Lerp(transform.position, networkPosition, 10f * Time.fixedDeltaTime);
-            transform.rotation = Quaternion.Slerp(transform.rotation, networkRotation, 10f * Time.fixedDeltaTime);
+            transform.position = Vector3.Lerp(transform.position, networkPosition, 5f * Time.fixedDeltaTime);
+            transform.rotation = Quaternion.Slerp(transform.rotation, networkRotation, 5f * Time.fixedDeltaTime);
         }
 
         // === APLICAR ANIMACIONES EN TODOS LOS CLIENTES ===
