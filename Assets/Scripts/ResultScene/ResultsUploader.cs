@@ -1,56 +1,24 @@
+using LootLocker.Requests;
 using UnityEngine;
-using Photon.Pun;
 
-public class ResultsUploader : MonoBehaviour
+public class LeaderboardService : MonoBehaviour
 {
-    [SerializeField] string leaderboardKey = "e580355f5c684ef4908f55eaf8d9fd43";
-    [SerializeField] ScoreManager scoreManager; 
-
-    bool uploaded;
-
-    void OnEnable()
+    // Envía el score al leaderboard
+    public static void SubmitScore(int score, string leaderboardKey, System.Action<bool> onDone = null)
     {
-        TryUpload();
-    }
+        var memberId = SystemInfo.deviceUniqueIdentifier;
 
-    void TryUpload()
-    {
-        if (uploaded) return;
-
-        if (!LootLockerBootstrap.SessionStarted)
+        LootLockerSDKManager.SubmitScore(memberId, score, leaderboardKey, response =>
         {
-            Debug.LogWarning("[ResultsUploader] LootLocker no listo aún. Reintentando en 1s...");
-            Invoke(nameof(TryUpload), 1.0f);
-            return;
-        }
-
-        if (scoreManager == null)
-        {
-            scoreManager = FindObjectOfType<ScoreManager>(true);
-        }
-
-        int myActorNumber = PhotonNetwork.LocalPlayer?.ActorNumber ?? -1;
-        if (myActorNumber < 0)
-        {
-            Debug.LogWarning("[ResultsUploader] LocalPlayer inválido.");
-            return;
-        }
-
-        int myMatchScore = 0;
-        if (scoreManager != null)
-        {
-            scoreManager.TryGetScoreForActor(myActorNumber, out myMatchScore);
-        }
-
-        // Envia mi score de la partida como acumulado al leaderboard global
-        LeaderboardService.SubmitCumulativeScoreForCurrentPlayer(myMatchScore, leaderboardKey, success =>
-        {
-            uploaded = success;
-            if (!success)
+            Debug.Log($"SubmitScore success={response.success} status={response.statusCode}");
+            if (!response.success)
             {
-                // Reintento simple si falla la red
-                Invoke(nameof(TryUpload), 2.0f);
+                Debug.LogError("Fallo el envío de score");
+                onDone?.Invoke(false);
+                return;
             }
+
+            onDone?.Invoke(true);
         });
     }
 }

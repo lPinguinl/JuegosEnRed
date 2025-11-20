@@ -18,12 +18,14 @@ MonoBehaviour:
   game_version: 1.0.0.0
   sdk_version: 6.5.0
   url: https://api.lootlocker.com/v1
-  adminUrl: https://vddat9ha.api.lootlocker.com/admin
-  playerUrl: https://vddat9ha.api.lootlocker.com/player
-  userUrl: https://vddat9ha.api.lootlocker.com/game
-  baseUrl: https://vddat9ha.api.lootlocker.com
+  adminUrl: https://api.lootlocker.com/admin
+  playerUrl: https://api.lootlocker.com/player
+  userUrl: https://api.lootlocker.com/game
+  baseUrl: https://api.lootlocker.com
   clientSideRequestTimeOut: 180
-  logLevel: 2
+  logLevel: 5
+  prettifyJson: 1
+  obfuscateLogs: 1
   logErrorsAsWarnings: 0
   logInBuilds: 0
   allowTokenRefresh: 1

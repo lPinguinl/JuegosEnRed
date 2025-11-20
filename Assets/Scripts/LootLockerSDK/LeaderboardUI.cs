@@ -8,16 +8,57 @@ public class LeaderboardUI : MonoBehaviour
     [SerializeField] int count = 10;
     [SerializeField] TMPro.TextMeshProUGUI tableText;
 
+    [SerializeField] float autoRefreshInterval = 0f;
+    Coroutine autoRoutine;
+
     void OnEnable()
     {
+        LootLockerBootstrap.OnSessionStarted += HandleSessionStarted;
+
+        if (LootLockerBootstrap.SessionStarted)
+            Refresh();
+    }
+
+    void Start()
+    {
+        if (autoRefreshInterval > 0f)
+            autoRoutine = StartCoroutine(AutoRefreshLoop());
+    }
+
+    void OnDisable()
+    {
+        LootLockerBootstrap.OnSessionStarted -= HandleSessionStarted;
+
+        if (autoRoutine != null)
+        {
+            StopCoroutine(autoRoutine);
+            autoRoutine = null;
+        }
+    }
+
+    void HandleSessionStarted()
+    {
         Refresh();
+    }
+
+    System.Collections.IEnumerator AutoRefreshLoop()
+    {
+        while (!LootLockerBootstrap.SessionStarted)
+            yield return null;
+
+        var wait = new WaitForSeconds(autoRefreshInterval);
+        while (true)
+        {
+            Refresh();
+            yield return wait;
+        }
     }
 
     public void Refresh()
     {
         if (!LootLockerBootstrap.SessionStarted)
         {
-            tableText.text = "Logueando...";
+            if (tableText) tableText.text = "Logueando...";
             return;
         }
 
@@ -25,35 +66,37 @@ public class LeaderboardUI : MonoBehaviour
         {
             if (!response.success)
             {
-                tableText.text = "Error...";
+                if (tableText) tableText.text = "Error...";
+                Debug.LogError($"GetScoreList fallo. success={response.success} status={response.statusCode}");
                 return;
             }
 
-            var sb = new StringBuilder();
-            sb.AppendLine("Rank  Name              Score");
-            sb.AppendLine("----  ----------------  -----");
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("Rank  Name - Score");
+            sb.AppendLine("------------------");
 
             var items = response.items;
             if (items == null || items.Length == 0)
             {
-                sb.AppendLine("No se registró nada todavía");
+                sb.AppendLine("No hay entradas aún.");
             }
             else
             {
                 foreach (var item in items)
                 {
                     string name = string.IsNullOrEmpty(item.player.name)
-                        ? "Player " + item.player.id
+                        ? $"Player {item.player.id}"
                         : item.player.name;
-                    sb.AppendLine($"{item.rank,4}  {name,-16}  {item.score,5}");
+
+                    // Una línea simple por entrada
+                    sb.AppendLine($"{item.rank}. {name} - {item.score}");
                 }
             }
 
-            tableText.text = sb.ToString();
+            if (tableText) tableText.text = sb.ToString();
         });
     }
 
-    // Botones opcionales:
     public void OnSubmitScoreTMP(TMPro.TMP_InputField scoreInput)
     {
         if (int.TryParse(scoreInput.text, out var score))
@@ -64,6 +107,21 @@ public class LeaderboardUI : MonoBehaviour
 
     public void OnSetNameTMP(TMPro.TMP_InputField nameInput)
     {
-        PlayerNameHelper.SetPlayerName(nameInput.text);
+        var newName = nameInput.text;
+
+        PlayerNameHelper.SetPlayerName(newName, success =>
+        {
+            if (!success)
+            {
+                Refresh();
+                return;
+            }
+
+            // Opcional: forzar actualización enviando un score
+            // var memberId = SystemInfo.deviceUniqueIdentifier;
+            // LootLockerSDKManager.SubmitScore(memberId, 0, leaderboardKey, r => Refresh());
+
+            Refresh();
+        });
     }
 }

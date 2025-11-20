@@ -1,16 +1,24 @@
 using LootLocker.Requests;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
-public class PlayerNameHelper : MonoBehaviour
+namespace MyGame // puedes cambiar el nombre si quieres
 {
-    public static void SetPlayerName(string name)
+    public class PlayerNameHelper : MonoBehaviour
     {
-        LootLockerSDKManager.SetPlayerName(name, resp =>
+        public static void SetPlayerName(string name, System.Action<bool> onDone = null)
         {
-            if (!resp.success) Debug.LogError("Fallo nombre");
-            else Debug.Log("Se puso el nombre");
-        });
+            LootLockerSDKManager.SetPlayerName(name, resp =>
+            {
+                if (!resp.success)
+                {
+                    Debug.LogError($"Fallo al setear nombre. success={resp.success} status={resp.statusCode}");
+                    onDone?.Invoke(false);
+                    return;
+                }
+
+                Debug.Log("Se puso el nombre");
+                onDone?.Invoke(true);
+            });
+        }
     }
 }
