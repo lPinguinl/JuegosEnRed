@@ -360,6 +360,56 @@ public class GameStateManager : MonoBehaviourPunCallbacks
         ApplyState(state, start, duration);
         return true;
     }
+    
+    //Disconetion Handler
+    public override void OnPlayerLeftRoom(Photon.Realtime.Player otherPlayer)
+    {
+        // Solo el Master escribe la verdad en Room Properties
+        if (!PhotonNetwork.IsMasterClient) return;
+        if (otherPlayer == null) return;
+
+        // 1) Leer quién es el dueño actual de la corona
+        var room = PhotonNetwork.CurrentRoom;
+        if (room == null) return;
+
+        int currentCrownOwner = -1;
+        if (room.CustomProperties != null &&
+            room.CustomProperties.TryGetValue("CrownOwner", out object v) &&
+            v is int owner)
+        {
+            currentCrownOwner = owner;
+        }
+
+        // 2) Si el que se fue era el dueño, decidir nuevo dueño
+        if (currentCrownOwner == otherPlayer.ActorNumber)
+        {
+            int newOwner = PickNewCrownOwnerExcluding(otherPlayer.ActorNumber);
+
+            // 3) Escribir Room Prop y anunciar
+            var props = new ExitGames.Client.Photon.Hashtable { { "CrownOwner", newOwner } };
+            room.SetCustomProperties(props);
+
+            // Reusar RPC para feedback y lógica local
+            photonView.RPC(nameof(RPC_AnnounceCrownWinner), RpcTarget.All, newOwner);
+        }
+    }
+
+// Regla simple: menor ActorNumber entre los que siguen en la sala; si no hay, -1
+    private int PickNewCrownOwnerExcluding(int excludedActorNumber)
+    {
+        var players = PhotonNetwork.PlayerList;
+        if (players == null || players.Length == 0) return -1;
+
+        int candidate = -1;
+        foreach (var p in players)
+        {
+            if (p == null) continue;
+            if (p.ActorNumber == excludedActorNumber) continue;
+            if (candidate == -1 || p.ActorNumber < candidate)
+                candidate = p.ActorNumber;
+        }
+        return candidate; // si queda solo, retorna -1
+    }
 
     [PunRPC]
     private void RPC_AnnounceCrownWinner(int winnerActorNumber)

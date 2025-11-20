@@ -477,4 +477,31 @@ public class GameManager : MonoBehaviour, IGameEndHandler
                && props.ContainsKey(GameTimer.ROOM_KEY_START)
                && props.ContainsKey(GameTimer.ROOM_KEY_DURATION);
     }
+    
+    //Disconetion Handler
+    public void OnMasterClientSwitched(Photon.Realtime.Player newMasterClient)
+    {
+        // Asegurar que el timer siga (si no hay props, el nuevo Master las setea)
+        if (gameTimer != null && matchClock != null && !matchTimerInitialized)
+        {
+            gameTimer.Initialize(matchClock, timerPresenter, this, matchDurationSeconds);
+            matchTimerInitialized = true;
+        }
+
+        // Reiniciar/asegurar spawner si lo tenés en la escena (solo corre en Master)
+        var spawner = FindObjectOfType<PowerUpSpawnerManager>();
+        if (spawner != null)
+        {
+            spawner.enabled = PhotonNetwork.IsMasterClient;
+        }
+    }
+
+    public void OnPlayerLeftRoom(Photon.Realtime.Player otherPlayer)
+    {
+        // Limpieza defensiva por si el TagObject quedó apuntando a un GO destruido
+        if (PhotonNetwork.LocalPlayer != null && PhotonNetwork.LocalPlayer.TagObject is GameObject go && go == null)
+        {
+            PhotonNetwork.LocalPlayer.TagObject = null;
+        }
+    }
 }
