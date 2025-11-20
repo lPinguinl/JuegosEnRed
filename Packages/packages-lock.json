@@ -1,5 +1,12 @@
 {
   "dependencies": {
+    "com.lootlocker.lootlockersdk": {
+      "version": "https://github.com/lootlocker/unity-sdk.git",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "724529c4a63d1d927b7f519ef8645ed980fb0ccc"
+    },
     "com.unity.collab-proxy": {
       "version": "1.17.7",
       "depth": 0,
