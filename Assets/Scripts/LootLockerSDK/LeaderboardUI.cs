@@ -6,9 +6,14 @@ using UnityEngine;
 
 public class LeaderboardUI : MonoBehaviour
 {
-    [SerializeField] string leaderboardKey = "jueveskey";
+    [SerializeField] string leaderboardKey = "e580355f5c684ef4908f55eaf8d9fd43";
     [SerializeField] int count = 10;
     [SerializeField] TMPro.TextMeshProUGUI tableText;
+
+    void OnEnable()
+    {
+        Refresh();
+    }
 
     public void Refresh()
     {
@@ -26,8 +31,8 @@ public class LeaderboardUI : MonoBehaviour
             }
 
             StringBuilder sb = new StringBuilder();
-            sb.AppendLine("Rank Name              Score");
-            sb.AppendLine("-----------------------------");
+            sb.AppendLine("Rank Name    Score");
+            sb.AppendLine("----");
 
             var items = response.items;
 
@@ -60,7 +65,4 @@ public class LeaderboardUI : MonoBehaviour
     {
         PlayerNameHelper.SetPlayerName(nameInput.text);
     }
-
-
-
 }

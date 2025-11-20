@@ -222,7 +222,7 @@ public class ScoreManager : MonoBehaviourPunCallbacks
         return true;
     }
 
-    // NUEVO: Publica ganador y snapshot de puntajes en Room Properties
+    // Publica ganador y snapshot de puntajes en Room Properties
     public void PublishResultsToRoom()
     {
         if (!PhotonNetwork.IsMasterClient || PhotonNetwork.CurrentRoom == null)
@@ -257,4 +257,19 @@ public class ScoreManager : MonoBehaviourPunCallbacks
         PhotonNetwork.CurrentRoom.SetCustomProperties(roomProps);
         Debug.Log($"[ScoreManager] Results published. Winner actor: {(winner != null ? winner.ActorNumber : -1)}");
     }
+
+    public bool TryGetScoreForActor(int actorNumber, out int score)
+    {
+        score = 0;
+        var player = PhotonNetwork.CurrentRoom?.GetPlayer(actorNumber);
+        if (player == null) return false;
+
+        if (player.CustomProperties != null && player.CustomProperties.TryGetValue("CrownScore", out object scoreObj))
+        {
+            score = (int)scoreObj;
+            return true;
+        }
+        return false;
+    }
+
 }

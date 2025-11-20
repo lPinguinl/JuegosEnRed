@@ -1,22 +1,59 @@
 using LootLocker.Requests;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class LeaderboardService : MonoBehaviour
 {
+    // Guardamos el total acumulado localmente
+    private const string LocalTotalKey = "ll_local_total_score";
+
+    // Envía un score absoluto al leaderboard
     public static void SubmitScore(int score, string leaderboardKey, System.Action<bool> onDone = null)
     {
         LootLockerSDKManager.SubmitScore("", score, leaderboardKey, response =>
         {
             if (!response.success)
             {
-                Debug.LogError("Fallo el score");
+                Debug.LogError("[Leaderboard] Falló SubmitScore");
                 onDone?.Invoke(false);
-
                 return;
             }
-            Debug.Log("Se envio el score");
+            Debug.Log("[Leaderboard] Score enviado (absoluto)");
+            onDone?.Invoke(true);
+        });
+    }
+
+    // Acumulado local: suma deltaScore al total guardado en PlayerPrefs y sube ese total
+    public static void SubmitCumulativeScoreForCurrentPlayer(int deltaScore, string leaderboardKey, System.Action<bool> onDone = null)
+    {
+        if (!LootLockerBootstrap.SessionStarted)
+        {
+            Debug.LogWarning("[Leaderboard] La sesión de LootLocker no está iniciada.");
+            onDone?.Invoke(false);
+            return;
+        }
+
+        // Nunca restar
+        deltaScore = Mathf.Max(0, deltaScore);
+
+        // Leer total actual local
+        int currentTotal = PlayerPrefs.GetInt(LocalTotalKey, 0);
+        int newTotal = currentTotal + deltaScore;
+
+        // Guardar localmente
+        PlayerPrefs.SetInt(LocalTotalKey, newTotal);
+        PlayerPrefs.Save();
+
+        // Enviar total al leaderboard
+        LootLockerSDKManager.SubmitScore("", newTotal, leaderboardKey, submitResp =>
+        {
+            if (!submitResp.success)
+            {
+                Debug.LogError("[Leaderboard] Falló SubmitScore (acumulado local)");
+                onDone?.Invoke(false);
+                return;
+            }
+
+            Debug.Log($"[Leaderboard] Total acumulado local actualizado y enviado: {currentTotal} + {deltaScore} = {newTotal}");
             onDone?.Invoke(true);
         });
     }
