@@ -40,7 +40,7 @@ namespace LootLocker
 
         public static void UploadFile(string forPlayerWithUlid, string endPoint, LootLockerHTTPMethod httpMethod, byte[] file, string fileName = "file", string fileContentType = "text/plain", Dictionary<string, string> body = null, Action<LootLockerResponse> onComplete = null, bool useAuthToken = true, LootLocker.LootLockerEnums.LootLockerCallerRole callerRole = LootLocker.LootLockerEnums.LootLockerCallerRole.User, Dictionary<string, string> additionalHeaders = null)
         {
-            if (file == null || file.Length == 0)
+            if (file == null ||Â file.Length == 0)
             {
                 LootLockerLogger.Log("File content is empty, not allowed.", LootLockerLogger.LogLevel.Error);
                 onComplete(LootLockerResponseFactory.ClientError<LootLockerResponse>("File content is empty, not allowed.", forPlayerWithUlid, DateTime.Now));
