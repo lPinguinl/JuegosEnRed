@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "com.lootlocker.lootlockersdk": "file:C:/Users/Minnbluee/Downloads/unity-sdk-6.4.0/unity-sdk-6.4.0",
+    "com.lootlocker.lootlockersdk": "https://github.com/lootlocker/unity-sdk.git",
     "com.unity.collab-proxy": "1.17.7",
     "com.unity.feature.development": "1.0.1",
     "com.unity.ide.rider": "3.0.16",
