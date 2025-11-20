@@ -437,7 +437,7 @@ RectTransform:
   - {fileID: 1340253764}
   - {fileID: 1187873801}
   m_Father: {fileID: 0}
-  m_RootOrder: 5
+  m_RootOrder: 4
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
@@ -540,7 +540,7 @@ RectTransform:
   - {fileID: 1359097906}
   - {fileID: 26305510}
   m_Father: {fileID: 0}
-  m_RootOrder: 4
+  m_RootOrder: 5
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
@@ -578,7 +578,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   leaderboardKey: e580355f5c684ef4908f55eaf8d9fd43
   count: 10
-  tableText: {fileID: 1459675049}
+  tableText: {fileID: 0}
 --- !u!4 &559570927
 Transform:
   m_ObjectHideFlags: 0
@@ -724,7 +724,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1187873799}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 1758138635}
+        m_TargetAssemblyTypeName: ResultUploader, Assembly-CSharp
+        m_MethodName: OnBackToMenuClicked
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1187873799
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1416,6 +1428,7 @@ GameObject:
   - component: {fileID: 1758138634}
   - component: {fileID: 1758138632}
   - component: {fileID: 1758138633}
+  - component: {fileID: 1758138635}
   m_Layer: 0
   m_Name: ResultsUploader
   m_TagString: Untagged
@@ -1435,9 +1448,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5fa34a84fc1dade46bb8a2f5a8cb7515, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  leaderboardKey: e580355f5c684ef4908f55eaf8d9fd43
-  scoreManager: {fileID: 0}
-  backToMenuButton: {fileID: 1187873798}
 --- !u!222 &1758138633
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -1466,6 +1476,18 @@ RectTransform:
   m_AnchoredPosition: {x: 908.986, y: 293.1016}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1758138635
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1758138631}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 850ab35e7b098714594164343c5eca10, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1963625961
 GameObject:
   m_ObjectHideFlags: 0
