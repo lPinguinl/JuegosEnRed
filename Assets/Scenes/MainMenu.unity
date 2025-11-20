@@ -832,6 +832,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: 'Enter Room Name...
 
+    Leave Empty to Rejoin
+
 '
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 0161d805a3764c089bef00bfe00793f5, type: 2}
@@ -859,7 +861,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 38.7
+  m_fontSize: 22.65
   m_fontSizeBase: 0
   m_fontWeight: 400
   m_enableAutoSizing: 1
