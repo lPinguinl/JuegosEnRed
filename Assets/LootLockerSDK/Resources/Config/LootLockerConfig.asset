@@ -13,17 +13,17 @@ MonoBehaviour:
   m_Name: LootLockerConfig
   m_EditorClassIdentifier: 
   apiKey: dev_5c32948572634ddfb75d5789c29327b1
-  adminToken: 70a1166dd231add7a1ffe9bd325a3cd2f0d95631
+  adminToken: 25c71574c6a4e6d67d48ec733c33e7b8666112ce
   domainKey: vddat9ha
   game_version: 1.0.0.0
   sdk_version: 6.5.0
   url: https://api.lootlocker.com/v1
-  adminUrl: https://vddat9ha.api.lootlocker.com/admin
-  playerUrl: https://vddat9ha.api.lootlocker.com/player
-  userUrl: https://vddat9ha.api.lootlocker.com/game
-  baseUrl: https://vddat9ha.api.lootlocker.com
+  adminUrl: https://api.lootlocker.com/admin
+  playerUrl: https://api.lootlocker.com/player
+  userUrl: https://api.lootlocker.com/game
+  baseUrl: https://api.lootlocker.com
   clientSideRequestTimeOut: 180
-  logLevel: 2
+  logLevel: 5
   prettifyJson: 1
   obfuscateLogs: 1
   logErrorsAsWarnings: 0

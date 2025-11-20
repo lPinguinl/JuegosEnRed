@@ -1,76 +1,24 @@
+using LootLocker.Requests;
 using UnityEngine;
-using UnityEngine.UI;
-using Photon.Pun;
 
-public class ResultsUploader : MonoBehaviour
+public class LeaderboardService : MonoBehaviour
 {
-    [Header("Leaderboard")]
-    [SerializeField] string leaderboardKey = "e580355f5c684ef4908f55eaf8d9fd43";
-    [SerializeField] ScoreManager scoreManager;
-
-    [Header("UI")]
-    [SerializeField] private Button backToMenuButton;   // <- botón opcional
-
-    bool uploaded;
-
-    void Awake()
+    // Env�a el score al leaderboard
+    public static void SubmitScore(int score, string leaderboardKey, System.Action<bool> onDone = null)
     {
-        // Registrar callback del botón si está asignado
-        if (backToMenuButton != null)
+        var memberId = SystemInfo.deviceUniqueIdentifier;
+
+        LootLockerSDKManager.SubmitScore(memberId, score, leaderboardKey, response =>
         {
-            backToMenuButton.onClick.AddListener(OnBackToMenuClicked);
-        }
-    }
-
-    void OnEnable()
-    {
-        TryUpload();
-    }
-
-    void TryUpload()
-    {
-        if (uploaded) return;
-
-        if (!LootLockerBootstrap.SessionStarted)
-        {
-            Debug.LogWarning("[ResultsUploader] LootLocker no listo aún. Reintentando en 1s...");
-            Invoke(nameof(TryUpload), 1.0f);
-            return;
-        }
-
-        if (scoreManager == null)
-        {
-            scoreManager = FindObjectOfType<ScoreManager>(true);
-        }
-
-        int myActorNumber = PhotonNetwork.LocalPlayer?.ActorNumber ?? -1;
-        if (myActorNumber < 0)
-        {
-            Debug.LogWarning("[ResultsUploader] LocalPlayer inválido.");
-            return;
-        }
-
-        int myMatchScore = 0;
-        if (scoreManager != null)
-        {
-            scoreManager.TryGetScoreForActor(myActorNumber, out myMatchScore);
-        }
-
-        LeaderboardService.SubmitCumulativeScoreForCurrentPlayer(myMatchScore, leaderboardKey, success =>
-        {
-            uploaded = success;
-            if (!success)
+            Debug.Log($"SubmitScore success={response.success} status={response.statusCode}");
+            if (!response.success)
             {
-                Invoke(nameof(TryUpload), 2.0f);
+                Debug.LogError("Fallo el env�o de score");
+                onDone?.Invoke(false);
+                return;
             }
-        });
-    }
 
-    // ---- Botón Volver al Menú ----
-    private void OnBackToMenuClicked()
-    {
-        
-        PhotonNetwork.LeaveRoom();
-        PhotonNetwork.LoadLevel("MainMenu");
+            onDone?.Invoke(true);
+        });
     }
 }
