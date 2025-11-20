@@ -36,7 +36,7 @@ public class LeaderboardUI : MonoBehaviour
             var items = response.items;
             if (items == null || items.Length == 0)
             {
-                sb.AppendLine("No se registró nada todavía");
+                sb.AppendLine("No se registrÃ³ nada todavÃ­a");
             }
             else
             {
