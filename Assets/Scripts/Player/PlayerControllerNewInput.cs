@@ -6,7 +6,7 @@ using Photon.Realtime;
 using ExitGames.Client.Photon;
 
 [RequireComponent(typeof(Rigidbody))]
-public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObservable
+public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
 {
     [SerializeField] private GameObject crownVisual;
 
@@ -20,6 +20,7 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
     private PlayerControls controls;
     private Vector2 moveInput;
 
+    // ESTADO DE RED RECIBIDO
     private Vector3 networkPosition;
     private Quaternion networkRotation;
 
@@ -39,19 +40,14 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
     [SerializeField] private float speedBoostMultiplier = 2.0f;
     private Coroutine speedBoostRoutine;
     
-    [Header("PowerUp UI")]
-    [SerializeField] private GameObject shieldIconUI;
-    [SerializeField] private GameObject speedIconUI;
-    [SerializeField] private GameObject grenadeIconUI;
-    
     [Header("Grenade")]
     [SerializeField] private bool hasGrenade = false;
 
     [Header("Animator")]
     [SerializeField] private Animator pAnimator;
 
-    // === ESTADOS DE ANIMACIÓN SINCRONIZADOS ===
-    // Se sincronizan via OnPhotonSerializeView, no por RPC.
+    // === ESTADOS DE ANIMACIÓN LOCALES Y DE RED ===
+    // Estos se envían/reciben en nuestros paquetes hechos a mano.
     private bool isRunning;
     private bool isPunching;
     [SerializeField] private float punchDuration = 0.5f;
@@ -121,6 +117,7 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
     {
         if (photonView.IsMine)
         {
+            // === SIMULACIÓN LOCAL ===
             GroundCheck();
             if (canMove)
             {
@@ -136,16 +133,15 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
                     rb.MoveRotation(Quaternion.Slerp(rb.rotation, targetRot, 10f * Time.fixedDeltaTime));
                 }
 
-                // === LÓGICA DE CORRER (DUEÑO) ===
+                // LÓGICA DE CORRER (solo dueño)
                 isRunning = (move != Vector3.zero);
             }
             else
             {
-                // Si no puede moverse, no corre.
                 isRunning = false;
             }
 
-            // === LÓGICA DE PUNCH (DUEÑO) ===
+            // LÓGICA DE PUNCH (solo dueño)
             if (isPunching)
             {
                 punchTimer -= Time.fixedDeltaTime;
@@ -154,10 +150,13 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
                     isPunching = false;
                 }
             }
+
+            // === ENVÍO DE PAQUETE HECHO A MANO CON MI ESTADO ===
+            SendStatePacket();
         }
         else
         {
-            // Interpolación de red
+            // === INTERPOLACIÓN DE RED EN CLIENTES REMOTOS ===
             transform.position = Vector3.Lerp(transform.position, networkPosition, 10f * Time.fixedDeltaTime);
             transform.rotation = Quaternion.Slerp(transform.rotation, networkRotation, 10f * Time.fixedDeltaTime);
         }
@@ -178,6 +177,15 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
         {
             rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
         }
+    }
+    
+    // === MÉTODO PARA INICIAR EL PUNCH (LO LLAMA StunHandler SOLO EN EL DUEÑO) ===
+    public void StartPunch()
+    {
+        if (!photonView.IsMine) return;
+
+        isPunching = true;
+        punchTimer = punchDuration;
     }
 
     private void GroundCheck()
@@ -267,7 +275,6 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
         if (PhotonNetwork.LocalPlayer == null || PhotonNetwork.LocalPlayer.ActorNumber != attackerActorNumber)
             return;
 
-        // Guardamos resultado en un pequeño buffer estático/servicio o invocamos un callback local.
         HitResultNotifier.Report(stunApplied);
     }
 
@@ -293,40 +300,115 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
         return isStunned;
     }
 
-    // === SINCRONIZACIÓN DE ESTADO POR RED (INCLUYENDO ANIMACIONES) ===
-    public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
+    // === ENVÍO DE PAQUETE MANUAL CON RaiseEvent ===
+    private void SendStatePacket()
     {
-        if (stream.IsWriting)
+        // Armamos el paquete de estado del jugador
+        object[] content = new object[]
         {
-            // Datos del dueño hacia la red
-            stream.SendNext(rb.position);
-            stream.SendNext(rb.rotation);
-            stream.SendNext(isStunned);
+            photonView.OwnerActorNr, // int: quién soy
+            rb.position,             // Vector3
+            rb.rotation,             // Quaternion
+            isStunned,               // bool
+            isRunning,               // bool
+            isPunching               // bool
+        };
 
-            // Animaciones
-            stream.SendNext(isRunning);
-            stream.SendNext(isPunching);
+        var raiseEventOptions = new RaiseEventOptions
+        {
+            Receivers = ReceiverGroup.Others,   // Solo los demás
+            CachingOption = EventCaching.DoNotCache
+        };
+
+        var sendOptions = new ExitGames.Client.Photon.SendOptions
+        {
+            Reliability = false                 // movimiento/animación suele ir no fiable
+        };
+
+        PhotonNetwork.RaiseEvent(MyEventCodes.PlayerStateUpdate, content, raiseEventOptions, sendOptions);
+    }
+
+    // === RECEPCIÓN DE PAQUETES Y APLICACIÓN DE ESTADO REMOTO ===
+    private void OnPhotonEvent(EventData photonEvent)
+    {
+        // 252 = EventCode interno de Photon para actualizar CustomProperties de Room/Player.
+        if (photonEvent.Code == 252)
+        {
+            UpdateCrownVisual();
+            return;
         }
-        else
-        {
-            // Datos recibidos desde la red
-            networkPosition = (Vector3)stream.ReceiveNext();
-            networkRotation = (Quaternion)stream.ReceiveNext();
-            isStunned = (bool)stream.ReceiveNext();
 
-            // Animaciones
-            isRunning = (bool)stream.ReceiveNext();
-            isPunching = (bool)stream.ReceiveNext();
+        if (photonEvent.Code == MyEventCodes.PlayerStateUpdate)
+        {
+            object[] data = (object[])photonEvent.CustomData;
+
+            int actorNumber = (int)data[0];
+
+            // Ignoramos paquetes que no son para este jugador
+            if (actorNumber != photonView.OwnerActorNr)
+                return;
+
+            // Si soy el dueño, no necesito aplicar mi propio paquete
+            if (photonView.IsMine)
+                return;
+
+            Vector3 pos = (Vector3)data[1];
+            Quaternion rot = (Quaternion)data[2];
+            bool stunned = (bool)data[3];
+            bool running = (bool)data[4];
+            bool punching = (bool)data[5];
+
+            networkPosition = pos;
+            networkRotation = rot;
+            isStunned = stunned;
+            isRunning = running;
+            isPunching = punching;
+        }
+    }
+    
+    [PunRPC]
+    private void RPC_SetShield(bool active)
+    {
+        hasShield = active;
+        // Sin UI por ahora.
+    }
+
+    [PunRPC]
+    private void RPC_ActivateSpeedBoost(float multiplier, float duration)
+    {
+        if (isSpeedBoosted) return; // No acumulable
+        isSpeedBoosted = true;
+        speedBoostMultiplier = multiplier;
+
+        if (speedBoostRoutine != null) StopCoroutine(speedBoostRoutine);
+        speedBoostRoutine = StartCoroutine(SpeedBoostCoroutine(duration));
+    }
+
+    [PunRPC]
+    private void RPC_DeactivateSpeedBoost()
+    {
+        if (!isSpeedBoosted) return;
+
+        isSpeedBoosted = false;
+
+        if (speedBoostRoutine != null)
+        {
+            StopCoroutine(speedBoostRoutine);
+            speedBoostRoutine = null;
         }
     }
 
-    // === MÉTODO PARA INICIAR EL PUNCH (LO LLAMA StunHandler SOLO EN EL DUEÑO) ===
-    public void StartPunch()
+    private System.Collections.IEnumerator SpeedBoostCoroutine(float duration)
     {
-        if (!photonView.IsMine) return;
-
-        isPunching = true;
-        punchTimer = punchDuration;
+        yield return new WaitForSeconds(duration);
+        // Al expirar, apagar en todos
+        photonView.RPC(nameof(RPC_DeactivateSpeedBoost), RpcTarget.All);
+    }
+    
+    [PunRPC]
+    private void RPC_SetHasGrenade(bool value)
+    {
+        hasGrenade = value;
     }
 
     private void ApplyColorFromProperties()
@@ -402,72 +484,6 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
         int crownOwner = GameManager.GetCrownOwnerActorNumber();
         crownVisual.SetActive(myActorNumber == crownOwner);
     }
-
-    private void OnPhotonEvent(EventData photonEvent)
-    {
-        // 252 = EventCode interno de Photon para actualizar CustomProperties de Room/Player.
-        if (photonEvent.Code == 252)
-        {
-            UpdateCrownVisual();
-        }
-    }
-    
-    
-    [PunRPC]
-    private void RPC_SetShield(bool active)
-    {
-        hasShield = active;
-
-        if (shieldIconUI != null)
-            shieldIconUI.SetActive(active);
-    }
-
-    [PunRPC]
-    private void RPC_ActivateSpeedBoost(float multiplier, float duration)
-    {
-        if (isSpeedBoosted) return;
-
-        isSpeedBoosted = true;
-        speedBoostMultiplier = multiplier;
-
-        if (speedIconUI != null)
-            speedIconUI.SetActive(true);
-
-        if (speedBoostRoutine != null)
-            StopCoroutine(speedBoostRoutine);
-
-        speedBoostRoutine = StartCoroutine(SpeedBoostCoroutine(duration));
-    }
-
-    [PunRPC]
-    private void RPC_DeactivateSpeedBoost()
-    {
-        isSpeedBoosted = false;
-
-        if (speedIconUI != null)
-            speedIconUI.SetActive(false);
-
-        if (speedBoostRoutine != null)
-            StopCoroutine(speedBoostRoutine);
-    }
-
-
-    private System.Collections.IEnumerator SpeedBoostCoroutine(float duration)
-    {
-        yield return new WaitForSeconds(duration);
-        // Al expirar, apagar en todos
-        photonView.RPC(nameof(RPC_DeactivateSpeedBoost), RpcTarget.All);
-    }
-    
-    [PunRPC]
-    private void RPC_SetHasGrenade(bool value)
-    {
-        hasGrenade = value;
-
-        if (grenadeIconUI != null)
-            grenadeIconUI.SetActive(value);
-    }
-
 }
 
 //Clase estatica para notificar si el stun fue efectivo o no y decidir sobre la transferencia de la corona
@@ -482,4 +498,9 @@ public static class HitResultNotifier
         lastResult = null;
         return r;
     }
+}
+
+public static class MyEventCodes
+{
+    public const byte PlayerStateUpdate = 1;
 }
