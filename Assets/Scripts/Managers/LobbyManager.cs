@@ -14,7 +14,8 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     [SerializeField] private GameObject playerListItemPrefab;
 
     private bool isPlayerReady = false;
-    private TMP_Text readyButtonLabel;
+    private TMP_Text primaryReadyLabel;
+    private TMP_Text[] allReadyLabels;          // <- capturamos todos los textos del botón
     private Dictionary<int, GameObject> playerListItems = new Dictionary<int, GameObject>();
 
     // Paleta de colores compartida para un máximo de 4 jugadores.
@@ -42,149 +43,171 @@ public class LobbyManager : MonoBehaviourPunCallbacks
 
     private void Start()
     {
-    if (roomNameText != null && PhotonNetwork.CurrentRoom != null)
-    roomNameText.text = PhotonNetwork.CurrentRoom.Name;
+        if (roomNameText != null && PhotonNetwork.CurrentRoom != null)
+            roomNameText.text = PhotonNetwork.CurrentRoom.Name;
 
-    if (readyButton != null)
-    {
-    readyButton.onClick.AddListener(OnReadyClicked);
-    readyButtonLabel = readyButton.GetComponentInChildren<TMP_Text>();
-    if (readyButtonLabel == null)
-    Debug.LogError("[LobbyManager] No TMP_Text found inside Ready Button.");
-    }
-    else
-    {
-    Debug.LogError("[LobbyManager] Ready Button not assigned in inspector.");
-    }
+        if (readyButton != null)
+        {
+            readyButton.onClick.AddListener(OnReadyClicked);
 
-    // Actualizamos la lista inicial de jugadores
-    UpdatePlayerList();
+            allReadyLabels = readyButton.GetComponentsInChildren<TMP_Text>(true);
+            if (allReadyLabels == null || allReadyLabels.Length == 0)
+            {
+                Debug.LogError("[LobbyManager] No TMP_Text components found inside Ready Button.");
+            }
+            else
+            {
+                primaryReadyLabel = allReadyLabels[0];
+                UpdateReadyButtonTexts();
+            }
+        }
+        else
+        {
+            Debug.LogError("[LobbyManager] Ready Button not assigned in inspector.");
+        }
 
-    // Asignar color al jugador local si no tiene
-    EnsurePlayerHasColor(PhotonNetwork.LocalPlayer);
+        // Actualizamos la lista inicial de jugadores
+        UpdatePlayerList();
+
+        // Asignar color al jugador local si no tiene
+        EnsurePlayerHasColor(PhotonNetwork.LocalPlayer);
     }
 
     private void OnReadyClicked()
     {
-    isPlayerReady = !isPlayerReady;
-    if (readyButtonLabel != null)
-    readyButtonLabel.text = isPlayerReady ? "Unready" : "Ready";
+        isPlayerReady = !isPlayerReady;
+        UpdateReadyButtonTexts();
 
-    SetPlayerReadyState(isPlayerReady);
+        SetPlayerReadyState(isPlayerReady);
 
-    if (PhotonNetwork.IsMasterClient)
-    CheckAndStartGame();
+        if (PhotonNetwork.IsMasterClient)
+            CheckAndStartGame();
+    }
+
+    private void UpdateReadyButtonTexts()
+    {
+        if (allReadyLabels == null || allReadyLabels.Length == 0) return;
+
+        string labelText = isPlayerReady ? "Unready" : "Ready";
+
+        for (int i = 0; i < allReadyLabels.Length; i++)
+        {
+            TMP_Text label = allReadyLabels[i];
+            if (label == null) continue;
+
+            label.text = (i == 0) ? labelText : string.Empty;
+        }
     }
 
     private void SetPlayerReadyState(bool ready)
     {
-    ExitGames.Client.Photon.Hashtable playerProps = new ExitGames.Client.Photon.Hashtable
-    {
-    [READY_KEY] = ready
-    };
-    PhotonNetwork.LocalPlayer.SetCustomProperties(playerProps);
+        ExitGames.Client.Photon.Hashtable playerProps = new ExitGames.Client.Photon.Hashtable
+        {
+            [READY_KEY] = ready
+        };
+        PhotonNetwork.LocalPlayer.SetCustomProperties(playerProps);
     }
 
     private void CheckAndStartGame()
     {
-    int playerCount = PhotonNetwork.CurrentRoom.PlayerCount;
-    int readyCount = 0;
+        int playerCount = PhotonNetwork.CurrentRoom.PlayerCount;
+        int readyCount = 0;
 
-    foreach (Player p in PhotonNetwork.PlayerList)
-    {
-    if (p.CustomProperties.TryGetValue(READY_KEY, out object readyObj) &&
-    readyObj is bool isReady && isReady)
-    {
-    readyCount++;
-    }
-    }
+        foreach (Player p in PhotonNetwork.PlayerList)
+        {
+            if (p.CustomProperties.TryGetValue(READY_KEY, out object readyObj) &&
+                readyObj is bool isReady && isReady)
+            {
+                readyCount++;
+            }
+        }
 
-    // ✅ Solo arranca si hay mínimo 2 jugadores y todos están listos
-    if (playerCount >= 2 && readyCount == playerCount)
-    {
-    StartGame();
-    }
+        // ✅ Solo arranca si hay mínimo 2 jugadores y todos están listos
+        if (playerCount >= 2 && readyCount == playerCount)
+        {
+            StartGame();
+        }
     }
 
     private void StartGame()
     {
-    if (!PhotonNetwork.IsMasterClient) return;
+        if (!PhotonNetwork.IsMasterClient) return;
 
-    PhotonNetwork.CurrentRoom.IsOpen = false;
-    PhotonNetwork.CurrentRoom.IsVisible = false;
+        PhotonNetwork.CurrentRoom.IsOpen = false;
+        PhotonNetwork.CurrentRoom.IsVisible = false;
 
-    PhotonNetwork.LoadLevel("GameScene");
+        PhotonNetwork.LoadLevel("GameScene");
     }
 
     public override void OnPlayerEnteredRoom(Player newPlayer)
     {
-    EnsurePlayerHasColor(newPlayer);
-    UpdatePlayerList();
+        EnsurePlayerHasColor(newPlayer);
+        UpdatePlayerList();
 
-    if (PhotonNetwork.IsMasterClient)
-    CheckAndStartGame();
+        if (PhotonNetwork.IsMasterClient)
+            CheckAndStartGame();
     }
 
     public override void OnPlayerLeftRoom(Player otherPlayer)
     {
-    UpdatePlayerList();
+        UpdatePlayerList();
 
-    if (PhotonNetwork.IsMasterClient)
-    CheckAndStartGame();
+        if (PhotonNetwork.IsMasterClient)
+            CheckAndStartGame();
     }
 
     public override void OnPlayerPropertiesUpdate(Player targetPlayer, ExitGames.Client.Photon.Hashtable changedProps)
     {
-    if (playerListItems.TryGetValue(targetPlayer.ActorNumber, out GameObject item))
-    {
-    item.GetComponent<PlayerListItem>().UpdateInfo();
-    }
+        if (playerListItems.TryGetValue(targetPlayer.ActorNumber, out GameObject item))
+        {
+            item.GetComponent<PlayerListItem>().UpdateInfo();
+        }
 
-    if (changedProps.ContainsKey(READY_KEY) && PhotonNetwork.IsMasterClient)
-    CheckAndStartGame();
+        if (changedProps.ContainsKey(READY_KEY) && PhotonNetwork.IsMasterClient)
+            CheckAndStartGame();
     }
 
     private void UpdatePlayerList()
     {
-    foreach (var item in playerListItems.Values)
-    Destroy(item);
-    playerListItems.Clear();
+        foreach (var item in playerListItems.Values)
+            Destroy(item);
+        playerListItems.Clear();
 
-    foreach (Player player in PhotonNetwork.PlayerList)
-    {
-    GameObject item = Instantiate(playerListItemPrefab, playerListContent);
-    PlayerListItem listItem = item.GetComponent<PlayerListItem>();
-    if (listItem != null)
-    {
-    listItem.SetPlayerInfo(player);
-    playerListItems[player.ActorNumber] = item;
-    }
-    }
+        foreach (Player player in PhotonNetwork.PlayerList)
+        {
+            GameObject item = Instantiate(playerListItemPrefab, playerListContent);
+            PlayerListItem listItem = item.GetComponent<PlayerListItem>();
+            if (listItem != null)
+            {
+                listItem.SetPlayerInfo(player);
+                playerListItems[player.ActorNumber] = item;
+            }
+        }
     }
 
     private void EnsurePlayerHasColor(Player p)
     {
-    if (p == null) return;
+        if (p == null) return;
 
-    if (p.CustomProperties.ContainsKey(COLOR_KEY))
-    return; // Ya tiene un color asignado
+        if (p.CustomProperties.ContainsKey(COLOR_KEY))
+            return; // Ya tiene un color asignado
 
-    HashSet<int> usedIndices = new HashSet<int>();
-    foreach (var pl in PhotonNetwork.PlayerList)
-    {
-    if (pl.CustomProperties.TryGetValue(COLOR_KEY, out object idxObj))
-    usedIndices.Add((int)idxObj);
-    }
+        HashSet<int> usedIndices = new HashSet<int>();
+        foreach (var pl in PhotonNetwork.PlayerList)
+        {
+            if (pl.CustomProperties.TryGetValue(COLOR_KEY, out object idxObj))
+                usedIndices.Add((int)idxObj);
+        }
 
-    // Elegimos el primer índice de color disponible
-    int newIdx = 0;
-    while (usedIndices.Contains(newIdx))
-    newIdx = (newIdx + 1) % palette.Length;
+        // Elegimos el primer índice de color disponible
+        int newIdx = 0;
+        while (usedIndices.Contains(newIdx))
+            newIdx = (newIdx + 1) % palette.Length;
 
-    ExitGames.Client.Photon.Hashtable props = new ExitGames.Client.Photon.Hashtable
-    {
-    [COLOR_KEY] = newIdx
-    };
-    p.SetCustomProperties(props);
+        ExitGames.Client.Photon.Hashtable props = new ExitGames.Client.Photon.Hashtable
+        {
+            [COLOR_KEY] = newIdx
+        };
+        p.SetCustomProperties(props);
     }
 }
