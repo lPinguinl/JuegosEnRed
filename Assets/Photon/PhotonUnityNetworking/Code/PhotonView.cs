@@ -599,10 +599,7 @@ namespace Photon.Pun
         /// <param name="methodName">The name of a fitting method that was has the RPC attribute.</param>
         /// <param name="target">The group of targets and the way the RPC gets sent.</param>
         /// <param name="parameters">The parameters that the RPC method has (must fit this call!).</param>
-        public void RPC(string methodName, RpcTarget target, params object[] parameters)
-        {
-            PhotonNetwork.RPC(this, methodName, target, false, parameters);
-        }
+   
 
         /// <summary>
         /// Call a RPC method of this GameObject on remote clients of this room (or on all, including this client).
