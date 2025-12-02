@@ -1,4 +1,5 @@
 using LootLocker.Requests;
+using MyGame;
 using System.Text;
 using UnityEngine;
 
