@@ -6,7 +6,7 @@ using Photon.Realtime;
 using ExitGames.Client.Photon;
 
 [RequireComponent(typeof(Rigidbody))]
-public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
+public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObservable
 {
     [SerializeField] private GameObject crownVisual;
 
@@ -20,7 +20,7 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
     private PlayerControls controls;
     private Vector2 moveInput;
 
-    // ESTADO DE RED RECIBIDO
+    // ESTADO DE RED RECIBIDO (PAQUETE HECHO A MANO)
     private Vector3 networkPosition;
     private Quaternion networkRotation;
 
@@ -30,16 +30,16 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
 
     private const string COLOR_KEY = "playerColorIdx";
 
-    private InputAction crownClaimAction;    // Acción manual para la tecla E (Input System)
+    private InputAction crownClaimAction;           // Acción manual para la tecla E
     private GameStateManager cachedStateManager;    // Referencia perezosa al gestor de estados
-    
+
     [Header("PowerUp States")]
     [SerializeField] private bool hasShield = false;
 
     [SerializeField] private bool isSpeedBoosted = false;
     [SerializeField] private float speedBoostMultiplier = 2.0f;
     private Coroutine speedBoostRoutine;
-    
+
     [Header("Grenade")]
     [SerializeField] private bool hasGrenade = false;
 
@@ -51,8 +51,8 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
     [SerializeField] private GameObject speedIconUI;
     [SerializeField] private GameObject grenadeIconUI;
 
-    // === ESTADOS DE ANIMACIÓN LOCALES Y DE RED ===
-    // Estos se envían/reciben en nuestros paquetes hechos a mano.
+    // === ESTADOS DE ANIMACIÓN LOCALES / REMOTOS ===
+    // Estos se sincronizan POR SEPARADO usando OnPhotonSerializeView.
     private bool isRunning;
     private bool isPunching;
     [SerializeField] private float punchDuration = 0.5f;
@@ -65,7 +65,7 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
         rb = GetComponent<Rigidbody>();
         controls = new PlayerControls();
 
-        // Acción rápida para la tecla E (Interactuar con la corona antes de iniciar la partida).
+        // Acción rápida para la tecla E (interactuar con la corona antes de la partida).
         crownClaimAction = new InputAction("ClaimCrown", binding: "<Keyboard>/e");
     }
 
@@ -73,7 +73,7 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
     {
         controls.Player.Enable();
         controls.Player.Move.performed += ctx => { if (photonView.IsMine) moveInput = ctx.ReadValue<Vector2>(); };
-        controls.Player.Move.canceled += ctx => { if (photonView.IsMine) moveInput = Vector2.zero; };
+        controls.Player.Move.canceled  += ctx => { if (photonView.IsMine) moveInput = Vector2.zero; };
         controls.Player.Jump.performed += ctx => { if (photonView.IsMine) TryJump(); };
 
         crownClaimAction.performed += OnCrownClaimPerformed;
@@ -124,12 +124,14 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
         {
             // === SIMULACIÓN LOCAL ===
             GroundCheck();
+
             if (canMove)
             {
                 Vector3 move = new Vector3(moveInput.x, 0f, moveInput.y);
                 if (move.magnitude > 1f) move.Normalize();
+
                 float currentSpeed = isSpeedBoosted ? moveSpeed * speedBoostMultiplier : moveSpeed;
-                Vector3 targetPos = rb.position + move * currentSpeed * Time.fixedDeltaTime;
+                Vector3 targetPos  = rb.position + move * currentSpeed * Time.fixedDeltaTime;
                 rb.MovePosition(targetPos);
 
                 if (move.sqrMagnitude > 0.001f)
@@ -138,7 +140,7 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
                     rb.MoveRotation(Quaternion.Slerp(rb.rotation, targetRot, 10f * Time.fixedDeltaTime));
                 }
 
-                // LÓGICA DE CORRER (solo dueño)
+                // Estado de correr (solo dueño)
                 isRunning = (move != Vector3.zero);
             }
             else
@@ -156,7 +158,7 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
                 }
             }
 
-            // === ENVÍO DE PAQUETE HECHO A MANO CON MI ESTADO ===
+            // === ENVÍO DE PAQUETE HECHO A MANO (SOLO POS / ROT / STUN) ===
             SendStatePacket();
         }
         else
@@ -169,7 +171,7 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
         // === APLICAR ANIMACIONES EN TODOS LOS CLIENTES ===
         if (pAnimator != null)
         {
-            pAnimator.SetBool("isRunning", isRunning);
+            pAnimator.SetBool("isRunning",  isRunning);
             pAnimator.SetBool("isPunching", isPunching);
         }
 
@@ -183,7 +185,7 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
             rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
         }
     }
-    
+
     // === MÉTODO PARA INICIAR EL PUNCH (LO LLAMA StunHandler SOLO EN EL DUEÑO) ===
     public void StartPunch()
     {
@@ -272,7 +274,7 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
         // Notificar golpe aplicado
         photonView.RPC(nameof(RPC_NotifyHitResultToAttacker), RpcTarget.All, attackerActorNumber, true);
     }
-    
+
     [PunRPC]
     private void RPC_NotifyHitResultToAttacker(int attackerActorNumber, bool stunApplied)
     {
@@ -305,35 +307,32 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
         return isStunned;
     }
 
-    // === ENVÍO DE PAQUETE MANUAL CON RaiseEvent ===
+    // === ENVÍO DE PAQUETE MANUAL CON RaiseEvent (POS / ROT / STUN) ===
     private void SendStatePacket()
     {
-        // Armamos el paquete de estado del jugador
         object[] content = new object[]
         {
             photonView.OwnerActorNr, // int: quién soy
             rb.position,             // Vector3
             rb.rotation,             // Quaternion
-            isStunned,               // bool
-            isRunning,               // bool
-            isPunching               // bool
+            isStunned                // bool
         };
 
         var raiseEventOptions = new RaiseEventOptions
         {
-            Receivers = ReceiverGroup.Others,   // Solo los demás
+            Receivers     = ReceiverGroup.Others,
             CachingOption = EventCaching.DoNotCache
         };
 
         var sendOptions = new ExitGames.Client.Photon.SendOptions
         {
-            Reliability = false                 // movimiento/animación suele ir no fiable
+            Reliability = false   // movimiento suele ir no fiable
         };
 
         PhotonNetwork.RaiseEvent(MyEventCodes.PlayerStateUpdate, content, raiseEventOptions, sendOptions);
     }
 
-    // === RECEPCIÓN DE PAQUETES Y APLICACIÓN DE ESTADO REMOTO ===
+    // === RECEPCIÓN DE PAQUETES MANUALES (POS / ROT / STUN) ===
     private void OnPhotonEvent(EventData photonEvent)
     {
         // 252 = EventCode interno de Photon para actualizar CustomProperties de Room/Player.
@@ -357,20 +356,36 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
             if (photonView.IsMine)
                 return;
 
-            Vector3 pos = (Vector3)data[1];
-            Quaternion rot = (Quaternion)data[2];
-            bool stunned = (bool)data[3];
-            bool running = (bool)data[4];
-            bool punching = (bool)data[5];
+            Vector3    pos     = (Vector3)data[1];
+            Quaternion rot     = (Quaternion)data[2];
+            bool       stunned = (bool)data[3];
 
             networkPosition = pos;
             networkRotation = rot;
-            isStunned = stunned;
-            isRunning = running;
-            isPunching = punching;
+            isStunned       = stunned;
         }
     }
-    
+
+    // === SINCRONIZACIÓN DE ANIMACIONES VIA OnPhotonSerializeView ===
+    public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
+    {
+        if (stream.IsWriting)
+        {
+            //Debug.Log($"[SerializeView] WRITE {photonView.OwnerActorNr} run={isRunning} punch={isPunching}");
+            stream.SendNext(isRunning);
+            stream.SendNext(isPunching);
+        }
+        else
+        {
+            bool newRunning  = (bool)stream.ReceiveNext();
+            bool newPunching = (bool)stream.ReceiveNext();
+            //Debug.Log($"[SerializeView] READ {photonView.OwnerActorNr} run={newRunning} punch={newPunching}");
+
+            isRunning  = newRunning;
+            isPunching = newPunching;
+        }
+    }
+
     [PunRPC]
     private void RPC_SetShield(bool active)
     {
@@ -384,7 +399,7 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
     private void RPC_ActivateSpeedBoost(float multiplier, float duration)
     {
         if (isSpeedBoosted) return; // No acumulable
-        isSpeedBoosted = true;
+        isSpeedBoosted      = true;
         speedBoostMultiplier = multiplier;
 
         if (speedIconUI != null)
@@ -411,13 +426,13 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
         }
     }
 
-    private System.Collections.IEnumerator SpeedBoostCoroutine(float duration)
+    private IEnumerator SpeedBoostCoroutine(float duration)
     {
         yield return new WaitForSeconds(duration);
         // Al expirar, apagar en todos
         photonView.RPC(nameof(RPC_DeactivateSpeedBoost), RpcTarget.All);
     }
-    
+
     [PunRPC]
     private void RPC_SetHasGrenade(bool value)
     {
@@ -437,7 +452,8 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
 
         int idx = (int)owner.CustomProperties[COLOR_KEY];
 
-        Color[] palette = {
+        Color[] palette =
+        {
             new Color(0.90f,0.20f,0.20f),
             new Color(0.20f,0.50f,0.95f),
             new Color(0.20f,0.80f,0.35f),
@@ -497,7 +513,7 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable
         if (crownVisual == null) return;
 
         int myActorNumber = photonView.Owner.ActorNumber;
-        int crownOwner = GameManager.GetCrownOwnerActorNumber();
+        int crownOwner    = GameManager.GetCrownOwnerActorNumber();
         crownVisual.SetActive(myActorNumber == crownOwner);
     }
 }
@@ -508,6 +524,7 @@ public static class HitResultNotifier
     private static bool? lastResult;
 
     public static void Report(bool stunApplied) => lastResult = stunApplied;
+
     public static bool? Consume()
     {
         var r = lastResult;
