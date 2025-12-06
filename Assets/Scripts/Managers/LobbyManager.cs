@@ -13,9 +13,12 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     [SerializeField] private Transform playerListContent;
     [SerializeField] private GameObject playerListItemPrefab;
 
+    // === UI DE MAPA ===
+    [SerializeField] private TMP_Dropdown MapDropdown;
+
     private bool isPlayerReady = false;
     private TMP_Text primaryReadyLabel;
-    private TMP_Text[] allReadyLabels;          // <- capturamos todos los textos del botón
+    private TMP_Text[] allReadyLabels;    // <- capturamos todos los textos del botón
     private Dictionary<int, GameObject> playerListItems = new Dictionary<int, GameObject>();
 
     // Paleta de colores compartida para un máximo de 4 jugadores.
@@ -41,11 +44,20 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     public const string COLOR_KEY = "playerColorIdx";
     private const string READY_KEY = "isReady";
 
+    // === ROOM PROPERTY PARA MAPA ===
+    private const string MAP_KEY = "selectedMap";
+
+    // Nombres de escenas correspondientes a las opciones del dropdown:
+    // Map 1 -> "GameScene"
+    // Map 2 -> "GameScene_2"
+    private readonly string[] mapSceneNames = { "GameScene", "GameScene_2" };
+
     private void Start()
     {
         if (roomNameText != null && PhotonNetwork.CurrentRoom != null)
             roomNameText.text = PhotonNetwork.CurrentRoom.Name;
 
+        // --- Ready Button ---
         if (readyButton != null)
         {
             readyButton.onClick.AddListener(OnReadyClicked);
@@ -66,12 +78,45 @@ public class LobbyManager : MonoBehaviourPunCallbacks
             Debug.LogError("[LobbyManager] Ready Button not assigned in inspector.");
         }
 
+        // --- Map Dropdown ---
+        if (MapDropdown != null)
+        {
+            // Nos aseguramos de que el dropdown tenga las opciones correctas
+            MapDropdown.ClearOptions();
+            MapDropdown.AddOptions(new List<string> { "Map 1", "Map 2" });
+
+            MapDropdown.onValueChanged.AddListener(OnMapDropdownChanged);
+
+            // Al entrar al lobby, sincronizamos la UI con la Room:
+            InitializeMapSelectionFromRoom();
+
+            // Mostrar/ocultar según sea MasterClient o no
+            if (PhotonNetwork.IsMasterClient)
+            {
+                MapDropdown.interactable = true;
+                MapDropdown.gameObject.SetActive(true);
+            }
+            else
+            {
+                MapDropdown.interactable = false;
+                MapDropdown.gameObject.SetActive(true); 
+            }
+        }
+        else
+        {
+            Debug.LogWarning("[LobbyManager] MapDropdown not assigned in inspector.");
+        }
+
         // Actualizamos la lista inicial de jugadores
         UpdatePlayerList();
 
         // Asignar color al jugador local si no tiene
         EnsurePlayerHasColor(PhotonNetwork.LocalPlayer);
     }
+
+    // ============================
+    //   LÓGICA DE READY / START
+    // ============================
 
     private void OnReadyClicked()
     {
@@ -136,9 +181,47 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         PhotonNetwork.CurrentRoom.IsOpen = false;
         PhotonNetwork.CurrentRoom.IsVisible = false;
 
-        PhotonNetwork.LoadLevel("GameScene");
+        // Determinar qué escena cargar según MAP_KEY
+        string sceneToLoad = mapSceneNames[0]; // por defecto "GameScene"
+
+        if (PhotonNetwork.CurrentRoom != null &&
+            PhotonNetwork.CurrentRoom.CustomProperties != null &&
+            PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(MAP_KEY, out object mapNameObj))
+        {
+            string mapName = mapNameObj as string;
+            if (!string.IsNullOrEmpty(mapName))
+            {
+                sceneToLoad = mapName;
+            }
+        }
+
+        PhotonNetwork.LoadLevel(sceneToLoad);
     }
 
+    // ============================
+    //   CALLBACKS DE PHOTON
+    // ============================
+
+    public override void OnMasterClientSwitched(Player newMasterClient)
+    {
+        base.OnMasterClientSwitched(newMasterClient);
+
+        if (MapDropdown == null) return;
+
+        // Si ahora yo soy el Master, habilito el dropdown.
+        if (PhotonNetwork.LocalPlayer == newMasterClient)
+        {
+            MapDropdown.gameObject.SetActive(true);
+            MapDropdown.interactable = true;
+        }
+        else
+        {
+            // Si no soy el Master, lo deshabilito (o lo oculto).
+            MapDropdown.interactable = false;
+            MapDropdown.gameObject.SetActive(true); // si querés ocultarlo
+        }
+    } 
+    
     public override void OnPlayerEnteredRoom(Player newPlayer)
     {
         EnsurePlayerHasColor(newPlayer);
@@ -167,10 +250,122 @@ public class LobbyManager : MonoBehaviourPunCallbacks
             CheckAndStartGame();
     }
 
+    // Se dispara cuando cambian las CustomProperties de la Room (incluido MAP_KEY)
+    public override void OnRoomPropertiesUpdate(ExitGames.Client.Photon.Hashtable propertiesThatChanged)
+    {
+        if (propertiesThatChanged.ContainsKey(MAP_KEY))
+        {
+            string mapName = propertiesThatChanged[MAP_KEY] as string;
+            UpdateMapDropdownFromRoomProperty(mapName);
+        }
+    }
+
+    // ============================
+    //   UI / MAPA
+    // ============================
+
+    /// <summary>
+    /// Llamado cuando cambia el dropdown de mapa en la UI.
+    /// Solo el MasterClient debe aplicar el cambio en la Room.
+    /// </summary>
+    private void OnMapDropdownChanged(int optionIndex)
+    {
+        if (!PhotonNetwork.IsMasterClient)
+        {
+            // Los clientes que no son master solo reflejan el valor que viene de la Room,
+            // así que si cambian localmente, idealmente deberías ignorarlo o revertirlo.
+            // Para simplificar, dejamos que el cambio se vea pero NO escribimos en la Room.
+            return;
+        }
+
+        // Seguridad por si el tamaño no coincide
+        if (optionIndex < 0 || optionIndex >= mapSceneNames.Length)
+        {
+            Debug.LogWarning($"[LobbyManager] MapDropdown index {optionIndex} fuera de rango. Usando índice 0.");
+            optionIndex = 0;
+        }
+
+        string selectedSceneName = mapSceneNames[optionIndex];
+
+        ExitGames.Client.Photon.Hashtable roomProps = new ExitGames.Client.Photon.Hashtable
+        {
+            [MAP_KEY] = selectedSceneName
+        };
+        PhotonNetwork.CurrentRoom.SetCustomProperties(roomProps);
+    }
+
+    /// <summary>
+    /// Al entrar al lobby, sincroniza el dropdown con la Room (o setea default si es Master).
+    /// </summary>
+    private void InitializeMapSelectionFromRoom()
+    {
+        if (PhotonNetwork.CurrentRoom == null || MapDropdown == null)
+            return;
+
+        // Si ya hay un MAP_KEY, lo usamos para posicionar el dropdown.
+        if (PhotonNetwork.CurrentRoom.CustomProperties != null &&
+            PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(MAP_KEY, out object mapNameObj))
+        {
+            string mapName = mapNameObj as string;
+            UpdateMapDropdownFromRoomProperty(mapName);
+        }
+        else
+        {
+            // Si no hay MAP_KEY y soy Master, seteo un valor por defecto.
+            if (PhotonNetwork.IsMasterClient)
+            {
+                string defaultMap = mapSceneNames[0]; // "GameScene"
+                ExitGames.Client.Photon.Hashtable roomProps = new ExitGames.Client.Photon.Hashtable
+                {
+                    [MAP_KEY] = defaultMap
+                };
+                PhotonNetwork.CurrentRoom.SetCustomProperties(roomProps);
+
+                // y también ajusto el dropdown localmente
+                MapDropdown.value = 0;
+            }
+            else
+            {
+                // Si no soy Master y no hay propiedad, simplemente mostramos opción 0
+                MapDropdown.value = 0;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Dado un nombre de escena (guardado en la Room), coloca el dropdown en el índice correcto.
+    /// </summary>
+    private void UpdateMapDropdownFromRoomProperty(string mapName)
+    {
+        if (MapDropdown == null) return;
+        if (string.IsNullOrEmpty(mapName))
+        {
+            MapDropdown.value = 0;
+            return;
+        }
+
+        // Buscar el índice en mapSceneNames
+        int index = 0;
+        for (int i = 0; i < mapSceneNames.Length; i++)
+        {
+            if (mapSceneNames[i] == mapName)
+            {
+                index = i;
+                break;
+            }
+        }
+
+        MapDropdown.value = index;
+    }
+
+    // ============================
+    //   LISTA DE JUGADORES / COLORES
+    // ============================
+
     private void UpdatePlayerList()
     {
         foreach (var item in playerListItems.Values)
-            Destroy(item);
+            GameObject.Destroy(item);
         playerListItems.Clear();
 
         foreach (Player player in PhotonNetwork.PlayerList)
