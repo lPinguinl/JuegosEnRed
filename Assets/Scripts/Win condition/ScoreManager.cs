@@ -272,8 +272,20 @@ public class ScoreManager : MonoBehaviourPunCallbacks
         return false;
     }
 
+   
+
+    private void OnDisable()
+    {
+        // Esto se ejecuta automáticamente cuando la escena cambia o el objeto se destruye.
+        GuardarPuntajeEnMemoria();
+    }
+
+    // Asegúrate de tener esta función (que ya hicimos)
     public void GuardarPuntajeEnMemoria()
     {
+        // Si no estamos conectados o no hay jugador local, no hacemos nada
+        if (PhotonNetwork.LocalPlayer == null) return;
+
         int puntajeFinal = 0;
 
         // Obtenemos el puntaje real de la red
@@ -282,12 +294,11 @@ public class ScoreManager : MonoBehaviourPunCallbacks
             puntajeFinal = (int)scoreObj;
         }
 
-        // LO GUARDAMOS EN EL DISPOSITIVO
-        // Esta es la clave: "ScoreDeLaPartida" es lo que lee la escena final.
+        // Guardamos en el dispositivo
         PlayerPrefs.SetInt("ScoreDeLaPartida", puntajeFinal);
         PlayerPrefs.Save();
 
-        Debug.Log($"[ScoreManager] Puntaje {puntajeFinal} guardado en memoria para la ResultScene.");
+        Debug.Log($"[ScoreManager] AUTOGUARDADO al salir: {puntajeFinal}");
     }
 }
 
