@@ -1,21 +1,33 @@
 using LootLocker.Requests;
 using UnityEngine;
+using System;
 
-public class PlayerNameHelper : MonoBehaviour
+public class LeaderboardService : MonoBehaviour
 {
-    public static void SetPlayerName(string name, System.Action<bool> onDone = null)
+    public static void SubmitScore(int score, string leaderboardKey, Action<bool> onDone = null)
     {
-        LootLockerSDKManager.SetPlayerName(name, resp =>
+        string memberId = SystemInfo.deviceUniqueIdentifier;
+
+        // 1. Definimos el callback exacto para evitar confusiones al compilador
+        Action<LootLockerSubmitScoreResponse> onResponse = (response) =>
         {
-            if (!resp.success)
+            if (!response.success)
             {
-                Debug.LogError($"Fallo al setear nombre. success={resp.success} status={resp.statusCode}");
+                // Manejo de errores seguro (evita el error de "message" o "Error")
+                string errorMsg = "Error desconocido";
+                if (response.errorData != null) errorMsg = response.errorData.message;
+
+                Debug.LogError($"Fallo el envío de score: {errorMsg}");
                 onDone?.Invoke(false);
                 return;
             }
 
-            Debug.Log("Se puso el nombre");
+            Debug.Log("Puntaje enviado correctamente.");
             onDone?.Invoke(true);
-        });
+        };
+
+        // 2. LLAMADA CORREGIDA: Solo 4 argumentos.
+        // Quitamos el 'true'. La configuración de sumar se hace en la web.
+        LootLockerSDKManager.SubmitScore(memberId, score, leaderboardKey, onResponse);
     }
 }

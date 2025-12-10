@@ -39,7 +39,6 @@ public class LootLockerBootstrap : MonoBehaviour
         {
             if (!response.success)
             {
-                // En algunas versiones existe .text; si no, solo se imprimen success y statusCode
                 var maybeText = (response as object).GetType().GetProperty("text")?.GetValue(response, null);
                 Debug.LogError($"Fallo al iniciar sesión. success={response.success} status={response.statusCode}" +
                                (maybeText != null ? $" text={maybeText}" : ""));

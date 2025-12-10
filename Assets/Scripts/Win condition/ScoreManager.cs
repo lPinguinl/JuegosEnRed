@@ -271,5 +271,25 @@ public class ScoreManager : MonoBehaviourPunCallbacks
         }
         return false;
     }
+   
+    public void GuardarPuntajeLocalParaResultados()
+    {
+        // La llave 'CrownScore' es la que usa tu ScoreManager
+        const string CrownScoreKey = "CrownScore";
+        int miPuntaje = 0;
 
+        // Obtenemos el puntaje desde las propiedades de Photon del jugador local
+        if (PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(CrownScoreKey, out object scoreObj))
+        {
+            // Aseguramos que sea un entero (int)
+            miPuntaje = (int)scoreObj;
+        }
+
+        Debug.Log($"[ScoreManager] Guardando puntaje local en PlayerPrefs: {miPuntaje}");
+
+        // Esta llave "ScoreDeLaPartida" es la que lee tu ResultScoreSubmitter
+        PlayerPrefs.SetInt("ScoreDeLaPartida", miPuntaje);
+        PlayerPrefs.Save();
+    }
 }
+

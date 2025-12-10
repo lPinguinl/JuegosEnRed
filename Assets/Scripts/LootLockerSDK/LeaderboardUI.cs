@@ -1,6 +1,8 @@
 using LootLocker.Requests;
+using System.Collections; 
 using System.Text;
 using UnityEngine;
+
 
 public class LeaderboardUI : MonoBehaviour
 {
@@ -41,7 +43,7 @@ public class LeaderboardUI : MonoBehaviour
         Refresh();
     }
 
-    System.Collections.IEnumerator AutoRefreshLoop()
+    IEnumerator AutoRefreshLoop()
     {
         while (!LootLockerBootstrap.SessionStarted)
             yield return null;
@@ -52,6 +54,44 @@ public class LeaderboardUI : MonoBehaviour
             Refresh();
             yield return wait;
         }
+    }
+
+    // FUNCIÓN CLAVE (A) - Conectada al botón de la UI que usa un Input Field.
+    public void OnSubmitScoreTMP(TMPro.TMP_InputField scoreInput)
+    {
+        if (int.TryParse(scoreInput.text, out var score))
+        {
+            LeaderboardService.SubmitScore(score, leaderboardKey, _ => Refresh());
+        }
+    }
+
+    // FUNCIÓN CLAVE (B) - Usada para enviar un score que ya fue calculado en el código (Result Scene).
+    // Conecta tu Result Manager a esta función si no tienes Input Field.
+    public void SubmitCalculatedScore(int scoreToSend)
+    {
+        if (!LootLockerBootstrap.SessionStarted)
+        {
+            Debug.LogWarning("No se puede enviar el puntaje, la sesión de LootLocker no ha iniciado.");
+            return;
+        }
+
+        LeaderboardService.SubmitScore(scoreToSend, leaderboardKey, _ => Refresh());
+    }
+
+    // Función conectada al botón para establecer el nombre (en el menú).
+    public void OnSetNameTMP(TMPro.TMP_InputField nameInput)
+    {
+        var newName = nameInput.text;
+
+        PlayerNameHelper.SetPlayerName(newName, success =>
+        {
+            if (!success)
+            {
+                Refresh();
+                return;
+            }
+            Refresh();
+        });
     }
 
     public void Refresh()
@@ -72,7 +112,7 @@ public class LeaderboardUI : MonoBehaviour
             }
 
             StringBuilder sb = new StringBuilder();
-            sb.AppendLine("Rank  Name - Score");
+            sb.AppendLine("Global Leaderboard");
             sb.AppendLine("------------------");
 
             var items = response.items;
@@ -88,40 +128,11 @@ public class LeaderboardUI : MonoBehaviour
                         ? $"Player {item.player.id}"
                         : item.player.name;
 
-                    // Una línea simple por entrada
                     sb.AppendLine($"{item.rank}. {name} - {item.score}");
                 }
             }
 
             if (tableText) tableText.text = sb.ToString();
-        });
-    }
-
-    public void OnSubmitScoreTMP(TMPro.TMP_InputField scoreInput)
-    {
-        if (int.TryParse(scoreInput.text, out var score))
-        {
-            LeaderboardService.SubmitScore(score, leaderboardKey, _ => Refresh());
-        }
-    }
-
-    public void OnSetNameTMP(TMPro.TMP_InputField nameInput)
-    {
-        var newName = nameInput.text;
-
-        PlayerNameHelper.SetPlayerName(newName, success =>
-        {
-            if (!success)
-            {
-                Refresh();
-                return;
-            }
-
-            // Opcional: forzar actualización enviando un score
-            // var memberId = SystemInfo.deviceUniqueIdentifier;
-            // LootLockerSDKManager.SubmitScore(memberId, 0, leaderboardKey, r => Refresh());
-
-            Refresh();
         });
     }
 }
