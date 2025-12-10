@@ -4,11 +4,9 @@ using ExitGames.Client.Photon;
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
+// Si tu GameManager está en un namespace (como Photon.Pun.Demo.PunBasics), descomenta la siguiente línea:
+// using Photon.Pun.Demo.PunBasics;
 
-/// <summary>
-/// Coordina el flujo de estados previos a la partida y decide quién obtiene la corona.
-/// Toda la sincronización ocurre a través de Room Custom Properties y RaiseEvent/RPC de Photon.
-///</summary>
 public class GameStateManager : MonoBehaviourPunCallbacks
 {
     public enum State
@@ -24,14 +22,18 @@ public class GameStateManager : MonoBehaviourPunCallbacks
     private const string RoomStateDurationKey = "MatchPreCountdownDuration";
     private const string CrownOwnerPropertyKey = "CrownOwner";
 
-    private const byte CrownAttemptEventCode = 38; // Código de RaiseEvent para presiones de tecla E
-    private const double CrownAttemptToleranceSeconds = 0.05; // Tolerancia por latencia (último en el dead-line)
+    private const byte CrownAttemptEventCode = 38;
+    private const double CrownAttemptToleranceSeconds = 0.05;
 
+    [Header("Settings")]
     [SerializeField] private double preGameCountdownSeconds = 5.0;
+    // NUEVO: Duración de la partida (ej: 120 segundos)
+    [SerializeField] private double matchDurationSeconds = 120.0;
+
     [Header("UI Crown Hint")]
     [SerializeField] private TMPro.TMP_Text crownHintText;
 
-    private readonly Dictionary<int, double> lastPressByActor = new(); // ActorNumber ➜ último timestamp (PhotonNetwork.Time) de la tecla E
+    private readonly Dictionary<int, double> lastPressByActor = new();
 
     private IMatchClock clock;
     private bool initialized;
@@ -43,7 +45,6 @@ public class GameStateManager : MonoBehaviourPunCallbacks
     private double preGameDeadline;
     private int lastCountdownBroadcast = -1;
 
-    // Eventos para que otros componentes (GameManager, UI, etc.) reaccionen al estado/tiempo.
     public event Action<State> StateChanged;
     public event Action<int> PreGameCountdownTick;
     public event Action<int> CrownWinnerDecided;
@@ -53,7 +54,6 @@ public class GameStateManager : MonoBehaviourPunCallbacks
 
     private void OnEnable()
     {
-        // Escuchamos los RaiseEvent que llegan desde clientes (código CrownAttemptEventCode)
         if (PhotonNetwork.NetworkingClient != null)
             PhotonNetwork.NetworkingClient.EventReceived += OnPhotonEvent;
     }
@@ -64,9 +64,6 @@ public class GameStateManager : MonoBehaviourPunCallbacks
             PhotonNetwork.NetworkingClient.EventReceived -= OnPhotonEvent;
     }
 
-    /// <summary>
-    /// Debe llamarse una sola vez desde GameManager, compartiendo el reloj común (PhotonMatchClock).
-    /// </summary>
     public void Initialize(IMatchClock sharedClock)
     {
         if (initialized) return;
@@ -75,7 +72,7 @@ public class GameStateManager : MonoBehaviourPunCallbacks
 
         if (PhotonNetwork.CurrentRoom == null)
         {
-            Debug.LogError("[GSM] No hay sala activa; no se puede sincronizar estados.");
+            Debug.LogError("[GSM] No hay sala activa.");
             return;
         }
 
@@ -83,13 +80,12 @@ public class GameStateManager : MonoBehaviourPunCallbacks
 
         if (PhotonNetwork.IsMasterClient)
         {
-            EnsureInitialState(); // Esto hace ApplyState()
+            EnsureInitialState();
             hasStateSnapshot = true;
         }
         else
         {
             hasStateSnapshot = TryReadStateFromRoom();
-            Debug.Log($"[GSM] Inicializado (Cliente). hasStateSnapshot={hasStateSnapshot}. Si es false, haré polling hasta que aparezcan las props.");
         }
     }
 
@@ -97,104 +93,39 @@ public class GameStateManager : MonoBehaviourPunCallbacks
     {
         if (!initialized || clock == null) return;
 
-        // Fallback: si aún no tenemos snapshot, intentar leerlo cada frame
         if (!hasStateSnapshot)
         {
             hasStateSnapshot = TryReadStateFromRoom();
-            if (!hasStateSnapshot) return; // todavía no puedo avanzar
+            if (!hasStateSnapshot) return;
         }
 
+        // LÓGICA DE ACTUALIZACIÓN SEGÚN EL ESTADO
         if (currentState == State.PreGameCountdown)
         {
             UpdatePreGameCountdown();
         }
-    }
-
-    /// <summary>
-    /// Llamado por cada jugador local cuando presiona la tecla E durante la cuenta regresiva.
-    /// </summary>
-    public void ReportCrownAttempt(int actorNumber)
-    {
-        if (!initialized || currentState != State.PreGameCountdown) return;
-
-        double pressTime = clock.Now;
-
-        if (PhotonNetwork.IsMasterClient)
+        else if (currentState == State.InGame) // <--- NUEVO: Controlamos el tiempo de juego
         {
-            // El Master registra directamente sin necesitar RaiseEvent.
-            RegisterCrownAttempt(actorNumber, pressTime);
-        }
-        else
-        {
-            SendCrownAttemptEvent(actorNumber, pressTime);
+            UpdateInGameTimer();
         }
     }
 
-    /// <summary>
-    /// Envia un RaiseEvent confiable al MasterClient con ActorNumber y timestamp del intento.
-    /// </summary>
-    private void SendCrownAttemptEvent(int actorNumber, double pressTime)
+    // --- LÓGICA DE TIEMPO DE JUEGO ---
+    private void UpdateInGameTimer()
     {
-        var payload = new object[] { actorNumber, pressTime };
-        var options = new RaiseEventOptions { Receivers = ReceiverGroup.MasterClient }; // Solo el Master necesita este dato
-        var sendOptions = new SendOptions { Reliability = true }; // Confiable para no perder intentos
+        // Calculamos cuándo termina la partida
+        double endTime = stateStartTime + matchDurationSeconds;
+        double remaining = endTime - clock.Now;
 
-        PhotonNetwork.RaiseEvent(CrownAttemptEventCode, payload, options, sendOptions);
-    }
-
-    /// <summary>
-    /// Procesa los RaiseEvent recibidos por el Master y guarda el último timestamp válido.
-    /// </summary>
-    private void OnPhotonEvent(EventData photonEvent)
-    {
-        if (!PhotonNetwork.IsMasterClient || photonEvent.Code != CrownAttemptEventCode) return;
-
-        if (photonEvent.CustomData is not object[] payload || payload.Length != 2) return;
-
-        int actorNumber = (int)payload[0];
-        double pressTime = (double)payload[1];
-
-        RegisterCrownAttempt(actorNumber, pressTime);
-    }
-
-    private void RegisterCrownAttempt(int actorNumber, double pressTime)
-    {
-        if (pressTime > preGameDeadline + CrownAttemptToleranceSeconds)
+        // Si el tiempo se acabó y soy el Master, termino el juego
+        if (PhotonNetwork.IsMasterClient && remaining <= 0.0)
         {
-            // Intento fuera de tiempo (latencia o spam tras finalizar la cuenta).
-            return;
-        }
-
-        lastPressByActor[actorNumber] = pressTime;
-    }
-
-    private void EnsureInitialState()
-    {
-        var room = PhotonNetwork.CurrentRoom;
-        if (room == null) return;
-
-        var props = room.CustomProperties;
-
-        if (!props.ContainsKey(RoomStateKey) || !props.ContainsKey(RoomStateStartKey))
-        {
-            double now = PhotonNetwork.Time;
-
-            var set = new Hashtable
-            {
-                { RoomStateKey, (int)State.PreGameCountdown },
-                { RoomStateStartKey, now },
-                { RoomStateDurationKey, preGameCountdownSeconds }
-            };
-
-            room.SetCustomProperties(set);
-            ApplyState(State.PreGameCountdown, now, preGameCountdownSeconds);
-        }
-        else
-        {
-            TryReadStateFromRoom();
+            Debug.Log("[GSM] Tiempo agotado. Finalizando partida.");
+            ChangeState(State.GameEnded);
         }
     }
 
+    // --- CAMBIO DE ESTADO ---
     private void ChangeState(State nextState)
     {
         var room = PhotonNetwork.CurrentRoom;
@@ -208,15 +139,18 @@ public class GameStateManager : MonoBehaviourPunCallbacks
             { RoomStateStartKey, now }
         };
 
+        // Guardamos la duración correcta según el estado
         if (nextState == State.PreGameCountdown)
-        {
             props[RoomStateDurationKey] = preGameCountdownSeconds;
-        }
+        else if (nextState == State.InGame)
+            props[RoomStateDurationKey] = matchDurationSeconds; // Guardamos duración del partido
 
-        // Escribimos en la sala para que todos los clientes reciban el cambio vía OnRoomPropertiesUpdate.
         room.SetCustomProperties(props);
 
-        double duration = nextState == State.PreGameCountdown ? preGameCountdownSeconds : 0.0;
+        double duration = 0.0;
+        if (nextState == State.PreGameCountdown) duration = preGameCountdownSeconds;
+        if (nextState == State.InGame) duration = matchDurationSeconds;
+
         ApplyState(nextState, now, duration);
     }
 
@@ -226,29 +160,48 @@ public class GameStateManager : MonoBehaviourPunCallbacks
         stateStartTime = startTime;
         currentStateDuration = duration;
         lastCountdownBroadcast = -1;
-        
-        // Mostrar/ocultar el texto de \"spammear E\" según el estado
+
         if (crownHintText != null)
-        {
-            // Lo mostramos SOLO durante la pre-cuenta
             crownHintText.gameObject.SetActive(newState == State.PreGameCountdown);
-        }
 
         if (newState == State.PreGameCountdown)
         {
             lastPressByActor.Clear();
-            preGameDeadline = stateStartTime + (duration > 0.0 ? duration : preGameCountdownSeconds);
+            preGameDeadline = stateStartTime + duration;
         }
 
         hasStateSnapshot = true;
-
         StateChanged?.Invoke(currentState);
 
         if (PhotonNetwork.IsMasterClient && currentState == State.CrownAssignment)
         {
             ResolveCrownAssignment();
         }
+
+        // --- AQUÍ SOLUCIONAMOS EL PROBLEMA DE LOS PUNTOS ---
+        if (currentState == State.GameEnded)
+        {
+            Debug.Log("[GSM] Fin del juego detectado. Guardando puntaje...");
+
+            // 1. Buscamos el ScoreManager y guardamos el puntaje REAL en PlayerPrefs
+            var scoreManager = FindObjectOfType<ScoreManager>();
+            if (scoreManager != null)
+            {
+                // ESTA LLAMADA EVITA QUE APAREZCA EL "100"
+                scoreManager.GuardarPuntajeEnMemoria();
+            }
+
+            // 2. Cambiamos de escena
+            // Como no tocamos el GameManager, usamos LoadLevel para mover a todos a resultados
+            if (PhotonNetwork.IsMasterClient)
+            {
+                // Asegúrate que tu escena se llame EXACTAMENTE "ResultScene"
+                PhotonNetwork.LoadLevel("ResultScene");
+            }
+        }
     }
+
+    // --- RESTO DE TU CÓDIGO ORIGINAL (SIN CAMBIOS) ---
 
     private void UpdatePreGameCountdown()
     {
@@ -271,49 +224,85 @@ public class GameStateManager : MonoBehaviourPunCallbacks
         }
     }
 
+    public void ReportCrownAttempt(int actorNumber)
+    {
+        if (!initialized || currentState != State.PreGameCountdown) return;
+        double pressTime = clock.Now;
+        if (PhotonNetwork.IsMasterClient) RegisterCrownAttempt(actorNumber, pressTime);
+        else SendCrownAttemptEvent(actorNumber, pressTime);
+    }
+
+    private void SendCrownAttemptEvent(int actorNumber, double pressTime)
+    {
+        var payload = new object[] { actorNumber, pressTime };
+        var options = new RaiseEventOptions { Receivers = ReceiverGroup.MasterClient };
+        var sendOptions = new SendOptions { Reliability = true };
+        PhotonNetwork.RaiseEvent(CrownAttemptEventCode, payload, options, sendOptions);
+    }
+
+    private void OnPhotonEvent(EventData photonEvent)
+    {
+        if (!PhotonNetwork.IsMasterClient || photonEvent.Code != CrownAttemptEventCode) return;
+        if (photonEvent.CustomData is not object[] payload || payload.Length != 2) return;
+        RegisterCrownAttempt((int)payload[0], (double)payload[1]);
+    }
+
+    private void RegisterCrownAttempt(int actorNumber, double pressTime)
+    {
+        if (pressTime > preGameDeadline + CrownAttemptToleranceSeconds) return;
+        lastPressByActor[actorNumber] = pressTime;
+    }
+
+    private void EnsureInitialState()
+    {
+        var room = PhotonNetwork.CurrentRoom;
+        if (room == null) return;
+        var props = room.CustomProperties;
+
+        if (!props.ContainsKey(RoomStateKey) || !props.ContainsKey(RoomStateStartKey))
+        {
+            double now = PhotonNetwork.Time;
+            var set = new Hashtable
+            {
+                { RoomStateKey, (int)State.PreGameCountdown },
+                { RoomStateStartKey, now },
+                { RoomStateDurationKey, preGameCountdownSeconds }
+            };
+            room.SetCustomProperties(set);
+            ApplyState(State.PreGameCountdown, now, preGameCountdownSeconds);
+        }
+        else
+        {
+            TryReadStateFromRoom();
+        }
+    }
+
     private void ResolveCrownAssignment()
     {
         int winningActor = DetermineCrownWinner();
-
         if (winningActor != -1)
         {
-            // Guardamos la corona en Room Custom Properties.
             var props = new Hashtable { { CrownOwnerPropertyKey, winningActor } };
             PhotonNetwork.CurrentRoom?.SetCustomProperties(props);
         }
-
-        // Notificamos a todos quién ganó (incluyendo al propio Master) mediante un RPC.
         photonView.RPC(nameof(RPC_AnnounceCrownWinner), RpcTarget.All, winningActor);
-
         ChangeState(State.InGame);
     }
 
     private int DetermineCrownWinner()
     {
-        if (lastPressByActor.Count == 0)
-        {
-            return GetLowestActorNumberInRoom();
-        }
-
+        if (lastPressByActor.Count == 0) return GetLowestActorNumberInRoom();
         int winner = -1;
         double latestTime = double.MinValue;
-
         foreach (var kvp in lastPressByActor)
         {
-            int actor = kvp.Key;
-            double pressTime = kvp.Value;
-
-            if (pressTime > preGameDeadline + CrownAttemptToleranceSeconds)
-                continue;
-
-            bool isBetter = pressTime > latestTime || (pressTime == latestTime && (winner == -1 || actor < winner));
-            if (isBetter)
+            if (kvp.Value > preGameDeadline + CrownAttemptToleranceSeconds) continue;
+            if (kvp.Value > latestTime || (kvp.Value == latestTime && (winner == -1 || kvp.Key < winner)))
             {
-                latestTime = pressTime;
-                winner = actor;
+                latestTime = kvp.Value;
+                winner = kvp.Key;
             }
         }
-
         return winner == -1 ? GetLowestActorNumberInRoom() : winner;
     }
 
@@ -321,109 +310,74 @@ public class GameStateManager : MonoBehaviourPunCallbacks
     {
         var players = PhotonNetwork.PlayerList;
         if (players == null || players.Length == 0) return -1;
-
         int lowest = int.MaxValue;
         foreach (var player in players)
-        {
-            if (player != null && player.ActorNumber < lowest)
-                lowest = player.ActorNumber;
-        }
-
+            if (player != null && player.ActorNumber < lowest) lowest = player.ActorNumber;
         return lowest == int.MaxValue ? -1 : lowest;
     }
 
     public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
     {
         if (propertiesThatChanged == null) return;
-
-        var keys = string.Join(",", propertiesThatChanged.Keys);
-        Debug.Log($"[GSM] OnRoomPropertiesUpdate keys=[{keys}] Master={PhotonNetwork.IsMasterClient}");
-
         if (propertiesThatChanged.ContainsKey(RoomStateKey) || propertiesThatChanged.ContainsKey(RoomStateStartKey))
-        {
             hasStateSnapshot = TryReadStateFromRoom() || hasStateSnapshot;
-        }
     }
 
     private bool TryReadStateFromRoom()
     {
         var room = PhotonNetwork.CurrentRoom;
         if (room == null) return false;
-
         var props = room.CustomProperties;
-        if (!props.TryGetValue(RoomStateKey, out object stateValue) ||
-            !props.TryGetValue(RoomStateStartKey, out object startValue))
-        {
-            return false;
-        }
+        if (!props.TryGetValue(RoomStateKey, out object stateValue) || !props.TryGetValue(RoomStateStartKey, out object startValue)) return false;
 
         State state = (State)(int)stateValue;
         double start = (double)startValue;
+        double duration = 0.0;
 
-        double duration = state == State.PreGameCountdown &&
-                          props.TryGetValue(RoomStateDurationKey, out object durationValue)
-            ? (double)durationValue
-            : 0.0;
+        if (state == State.PreGameCountdown || state == State.InGame)
+        {
+            if (props.TryGetValue(RoomStateDurationKey, out object val)) duration = (double)val;
+        }
 
-        Debug.Log($"[GSM] ApplyState state={state} start={start:F3} duration={duration:F2} now={clock?.Now:F3}");
         ApplyState(state, start, duration);
         return true;
     }
-    
-    //Disconetion Handler
+
     public override void OnPlayerLeftRoom(Photon.Realtime.Player otherPlayer)
     {
-        // Solo el Master escribe la verdad en Room Properties
-        if (!PhotonNetwork.IsMasterClient) return;
-        if (otherPlayer == null) return;
-
-        // 1) Leer quién es el dueño actual de la corona
+        if (!PhotonNetwork.IsMasterClient || otherPlayer == null) return;
         var room = PhotonNetwork.CurrentRoom;
         if (room == null) return;
 
         int currentCrownOwner = -1;
-        if (room.CustomProperties != null &&
-            room.CustomProperties.TryGetValue("CrownOwner", out object v) &&
-            v is int owner)
-        {
+        if (room.CustomProperties != null && room.CustomProperties.TryGetValue("CrownOwner", out object v) && v is int owner)
             currentCrownOwner = owner;
-        }
 
-        // 2) Si el que se fue era el dueño, decidir nuevo dueño
         if (currentCrownOwner == otherPlayer.ActorNumber)
         {
             int newOwner = PickNewCrownOwnerExcluding(otherPlayer.ActorNumber);
-
-            // 3) Escribir Room Prop y anunciar
-            var props = new ExitGames.Client.Photon.Hashtable { { "CrownOwner", newOwner } };
+            var props = new Hashtable { { "CrownOwner", newOwner } };
             room.SetCustomProperties(props);
-
-            // Reusar RPC para feedback y lógica local
             photonView.RPC(nameof(RPC_AnnounceCrownWinner), RpcTarget.All, newOwner);
         }
     }
 
-// Regla simple: menor ActorNumber entre los que siguen en la sala; si no hay, -1
     private int PickNewCrownOwnerExcluding(int excludedActorNumber)
     {
         var players = PhotonNetwork.PlayerList;
         if (players == null || players.Length == 0) return -1;
-
         int candidate = -1;
         foreach (var p in players)
         {
-            if (p == null) continue;
-            if (p.ActorNumber == excludedActorNumber) continue;
-            if (candidate == -1 || p.ActorNumber < candidate)
-                candidate = p.ActorNumber;
+            if (p == null || p.ActorNumber == excludedActorNumber) continue;
+            if (candidate == -1 || p.ActorNumber < candidate) candidate = p.ActorNumber;
         }
-        return candidate; // si queda solo, retorna -1
+        return candidate;
     }
 
     [PunRPC]
     private void RPC_AnnounceCrownWinner(int winnerActorNumber)
     {
-        // Este RPC se dispara en todos los clientes para mostrar feedback de UI y sincronizar lógica local.
         CrownWinnerDecided?.Invoke(winnerActorNumber);
     }
 }

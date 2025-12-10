@@ -113,7 +113,7 @@ public class LeaderboardUI : MonoBehaviour
 
             StringBuilder sb = new StringBuilder();
             sb.AppendLine("Global Leaderboard");
-            sb.AppendLine("------------------");
+            sb.AppendLine("Rank");
 
             var items = response.items;
             if (items == null || items.Length == 0)
