@@ -8,7 +8,7 @@ public class LeaderboardService : MonoBehaviour
     {
         string memberId = SystemInfo.deviceUniqueIdentifier;
 
-        // 1. Definimos el callback exacto para evitar confusiones al compilador
+        //Definimos el callback exacto para evitar confusiones al compilador
         Action<LootLockerSubmitScoreResponse> onResponse = (response) =>
         {
             if (!response.success)
@@ -26,8 +26,8 @@ public class LeaderboardService : MonoBehaviour
             onDone?.Invoke(true);
         };
 
-        // 2. LLAMADA CORREGIDA: Solo 4 argumentos.
-        // Quitamos el 'true'. La configuración de sumar se hace en la web.
+     
+        // La configuración de sumar se hace en la web.
         LootLockerSDKManager.SubmitScore(memberId, score, leaderboardKey, onResponse);
     }
 }

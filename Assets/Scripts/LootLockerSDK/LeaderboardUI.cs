@@ -56,7 +56,7 @@ public class LeaderboardUI : MonoBehaviour
         }
     }
 
-    // FUNCIÓN CLAVE (A) - Conectada al botón de la UI que usa un Input Field.
+    // Conectada al botón de la UI que usa un Input Field.
     public void OnSubmitScoreTMP(TMPro.TMP_InputField scoreInput)
     {
         if (int.TryParse(scoreInput.text, out var score))
@@ -65,8 +65,8 @@ public class LeaderboardUI : MonoBehaviour
         }
     }
 
-    // FUNCIÓN CLAVE (B) - Usada para enviar un score que ya fue calculado en el código (Result Scene).
-    // Conecta tu Result Manager a esta función si no tienes Input Field.
+    // Usada para enviar un score que ya fue calculado en el código (Result Scene).
+    
     public void SubmitCalculatedScore(int scoreToSend)
     {
         if (!LootLockerBootstrap.SessionStarted)
