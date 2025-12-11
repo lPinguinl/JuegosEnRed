@@ -157,4 +157,5 @@ MonoBehaviour:
   playerLayerMask:
     serializedVersion: 2
     m_Bits: 64
+  explosionPrefab: {fileID: 543412837737747692, guid: 7e27c60afb74a0b44a7240d7138a8106, type: 3}
   explodeOnImpact: 0

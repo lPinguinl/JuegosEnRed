@@ -11,6 +11,9 @@ public class Grenade : MonoBehaviourPun, IPunObservable
     [SerializeField] private float explosionRadius = 3.5f;
     [SerializeField] private float explosionForce = 6f; // opcional: empuje en explosión
     [SerializeField] private LayerMask playerLayerMask;
+    
+    [Header("FX")]
+    [SerializeField] private GameObject explosionPrefab;   // <— prefab visual
 
     [Header("Collision")]
     [SerializeField] private bool explodeOnImpact = true;
@@ -105,6 +108,10 @@ public class Grenade : MonoBehaviourPun, IPunObservable
     {
         if (exploded) return;
         exploded = true;
+        
+        Vector3 pos = transform.position;
+        
+        photonView.RPC(nameof(RPC_PlayExplosionFX), RpcTarget.All, pos);
 
         // AOE: encontrar jugadores alrededor
         Collider[] hits = Physics.OverlapSphere(transform.position, explosionRadius, playerLayerMask, QueryTriggerInteraction.Ignore);
@@ -129,6 +136,24 @@ public class Grenade : MonoBehaviourPun, IPunObservable
         else
             Destroy(gameObject);
     }
+    
+    [PunRPC]
+    private void RPC_PlayExplosionFX(Vector3 position)
+    {
+        if (explosionPrefab != null)
+            Instantiate(explosionPrefab, position, Quaternion.identity);
+
+        // Solo el jugador local sacude su propia cámara
+        var cam = Camera.main;
+        if (cam != null)
+        {
+            var shake = cam.GetComponent<CameraShake>();
+            if (shake != null)
+                shake.Shake(0.25f);
+        }
+    }
+
+
 
     private void FixedUpdate()
     {
