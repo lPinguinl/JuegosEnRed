@@ -3,30 +3,41 @@ using Photon.Pun;
 
 public class ZoneAnalyticsTracker : MonoBehaviour
 {
-    [SerializeField] private string zoneName;
+    [Header("Analytics")]
+    [SerializeField] private string zoneId;
+
     private float enterTime;
+    private bool isInside = false;
 
-    void OnTriggerEnter(Collider other)
+    private void Awake()
     {
-        PhotonView pv = other.GetComponentInParent<PhotonView>();
-        if (pv == null || !pv.IsMine) return;
-
-        enterTime = Time.time;
-        MatchAnalytics.Instance.ZoneEnter(
-            PhotonNetwork.LocalPlayer.ActorNumber,
-            zoneName
-        );
+        if (string.IsNullOrEmpty(zoneId))
+        {
+            zoneId = gameObject.name;
+        }
     }
 
-    void OnTriggerExit(Collider other)
+    private void OnTriggerEnter(Collider other)
     {
-        PhotonView pv = other.GetComponentInParent<PhotonView>();
-        if (pv == null || !pv.IsMine) return;
+        if (!other.CompareTag("Player")) return;
+        if (isInside) return;
 
-        MatchAnalytics.Instance.ZoneExit(
-            PhotonNetwork.LocalPlayer.ActorNumber,
-            zoneName,
-            Time.time - enterTime
-        );
+        isInside = true;
+        enterTime = Time.time;
+
+        int playerId = PhotonNetwork.LocalPlayer.ActorNumber;
+        MatchAnalytics.Instance.ZoneEnter(playerId, zoneId);
+    }
+
+    private void OnTriggerExit(Collider other)
+    {
+        if (!other.CompareTag("Player")) return;
+        if (!isInside) return;
+
+        isInside = false;
+        float duration = Time.time - enterTime;
+
+        int playerId = PhotonNetwork.LocalPlayer.ActorNumber;
+        MatchAnalytics.Instance.ZoneExit(playerId, zoneId, duration);
     }
 }
