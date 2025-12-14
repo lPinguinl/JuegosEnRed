@@ -709,6 +709,8 @@ PlayerSettings:
   vrEditorSettings: {}
   cloudServicesEnabled:
     Collab: 1
+    Legacy Analytics: 1
+    Purchasing: 0
     UNet: 1
   luminIcon:
     m_Name: 
