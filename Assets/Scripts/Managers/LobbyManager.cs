@@ -51,6 +51,12 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     // Map 1 -> "GameScene"
     // Map 2 -> "GameScene_2"
     private readonly string[] mapSceneNames = { "GameScene", "GameScene_2" };
+    
+    // Analytics//
+    
+    [SerializeField] private LobbyAnalyticsHook lobbyAnalytics;
+
+
 
     private void Start()
     {
@@ -112,6 +118,9 @@ public class LobbyManager : MonoBehaviourPunCallbacks
 
         // Asignar color al jugador local si no tiene
         EnsurePlayerHasColor(PhotonNetwork.LocalPlayer);
+        
+        lobbyAnalytics.Init();
+
     }
 
     // ============================
@@ -196,6 +205,13 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         }
 
         PhotonNetwork.LoadLevel(sceneToLoad);
+        
+        // Analytics//
+        MatchAnalytics.Instance.MatchStart(
+            PhotonNetwork.CurrentRoom.PlayerCount,
+            lobbyAnalytics.GetLobbyDuration()
+        );
+
     }
 
     // ============================

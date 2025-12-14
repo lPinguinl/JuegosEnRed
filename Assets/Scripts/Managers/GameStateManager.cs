@@ -200,8 +200,7 @@ public class GameStateManager : MonoBehaviourPunCallbacks
             }
         }
     }
-
-    // --- RESTO DE TU CÓDIGO ORIGINAL (SIN CAMBIOS) ---
+    
 
     private void UpdatePreGameCountdown()
     {

@@ -47,6 +47,12 @@ public class GameManager : MonoBehaviour, IGameEndHandler
     private bool matchTimerInitialized;
     private bool stateEventsSubscribed;
     private Coroutine crownAnnouncementRoutine;
+    
+// Analytics //
+    private float lobbyEnterTime;
+    private bool analyticsMatchStarted;
+    private int lastKnownCrownOwner = -1;
+
 
     // Sentinel para evitar doble spawn reentrante (por múltiples GameManager o Start simultáneos)
     private sealed class SpawnMarker { }
@@ -54,6 +60,8 @@ public class GameManager : MonoBehaviour, IGameEndHandler
     private void Awake()
     {
         matchClock = new PhotonMatchClock();
+        // Analytics
+        lobbyEnterTime = Time.time;
     }
 
     private void Start()
@@ -80,6 +88,8 @@ public class GameManager : MonoBehaviour, IGameEndHandler
     
     private void Update()
     {
+        // Analytics – Crown tracking
+        TrackCrownAnalytics();
         // Fallback existente (lo puedes dejar o quitar, no afecta)
         if (stateManager != null && stateManager.CurrentState == GameStateManager.State.PreGameCountdown && preGameCountdownText != null)
         {
@@ -296,11 +306,13 @@ public class GameManager : MonoBehaviour, IGameEndHandler
             case GameStateManager.State.InGame:
                 HideCountdownText();
                 StartMatchTimer();
+                StartMatchAnalytics(); // Analytics
                 break;
 
             case GameStateManager.State.GameEnded:
                 HideCountdownText();
                 break;
+            
         }
     }
 
@@ -415,6 +427,10 @@ public class GameManager : MonoBehaviour, IGameEndHandler
     /// </summary>
     public void OnMatchTimeEnded()
     {
+        
+        // Analytics
+        EndMatchAnalytics();
+        
         Debug.Log($"[GameManager] OnMatchTimeEnded. Master={PhotonNetwork.IsMasterClient}, resultScene={resultScene}");
         if (!PhotonNetwork.IsMasterClient) return;
 
@@ -504,4 +520,38 @@ public class GameManager : MonoBehaviour, IGameEndHandler
             PhotonNetwork.LocalPlayer.TagObject = null;
         }
     }
+    
+    // ====================== ANALYTICS ======================
+
+    private void StartMatchAnalytics()
+    {
+        if (analyticsMatchStarted) return;
+
+        float lobbyTime = Time.time - lobbyEnterTime;
+        int playerCount = PhotonNetwork.CurrentRoom.PlayerCount;
+
+        MatchAnalytics.Instance.MatchStart(playerCount, lobbyTime);
+        analyticsMatchStarted = true;
+    }
+
+    private void EndMatchAnalytics()
+    {
+        if (!analyticsMatchStarted) return;
+        MatchAnalytics.Instance.MatchEnd();
+    }
+
+    private void TrackCrownAnalytics()
+    {
+        int currentOwner = GetCrownOwnerActorNumber();
+        if (currentOwner == lastKnownCrownOwner) return;
+
+        if (lastKnownCrownOwner != -1)
+            MatchAnalytics.Instance.CrownLost(lastKnownCrownOwner);
+
+        if (currentOwner != -1)
+            MatchAnalytics.Instance.CrownPickup(currentOwner);
+
+        lastKnownCrownOwner = currentOwner;
+    }
+
 }

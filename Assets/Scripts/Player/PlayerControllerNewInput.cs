@@ -60,6 +60,10 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
 
     public bool HasGrenade => hasGrenade;
 
+    // Analytics//
+    private PlayerAnalyticsTracker analytics;
+
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
@@ -116,6 +120,11 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
         networkRotation = transform.rotation;
 
         ApplyColorFromProperties();
+        
+        // Analytics //
+        
+        analytics = GetComponent<PlayerAnalyticsTracker>();
+
     }
 
     private void FixedUpdate()
@@ -183,6 +192,11 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
         if (isGrounded && canMove)
         {
             rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
+            
+            //Analytics//
+            analytics?.ReportJump();
+
+
         }
     }
 
@@ -258,17 +272,21 @@ public class PlayerControllerNewInput : MonoBehaviourPun, IStunable, IPunObserva
 
             // Notificar al atacante que el golpe fue bloqueado
             photonView.RPC(nameof(RPC_NotifyHitResultToAttacker), RpcTarget.All, attackerActorNumber, false);
-            return;
+            analytics?.ReportBlocked(attackerActorNumber);
+             return;
         }
 
         if (isStunned)
         {
             // Ya estaba stuneado: lo consideramos golpe no-aplicado para evitar dobles transferencias
             photonView.RPC(nameof(RPC_NotifyHitResultToAttacker), RpcTarget.All, attackerActorNumber, false);
+            analytics?.ReportBlocked(attackerActorNumber);
             return;
+
         }
 
         isStunned = true;
+        analytics?.ReportStun(attackerActorNumber);
         StartCoroutine(StunCoroutine(attackerPosition));
 
         // Notificar golpe aplicado
