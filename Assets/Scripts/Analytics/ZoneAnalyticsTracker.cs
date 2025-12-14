@@ -19,25 +19,32 @@ public class ZoneAnalyticsTracker : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (!other.CompareTag("Player")) return;
+        PhotonView pv = other.GetComponentInParent<PhotonView>();
+        if (pv == null || !pv.IsMine) return;
         if (isInside) return;
 
         isInside = true;
         enterTime = Time.time;
 
-        int playerId = PhotonNetwork.LocalPlayer.ActorNumber;
-        MatchAnalytics.Instance.ZoneEnter(playerId, zoneId);
+        MatchAnalytics.Instance.ZoneEnter(
+            pv.Owner.ActorNumber,
+            zoneId
+        );
     }
 
     private void OnTriggerExit(Collider other)
     {
-        if (!other.CompareTag("Player")) return;
+        PhotonView pv = other.GetComponentInParent<PhotonView>();
+        if (pv == null || !pv.IsMine) return;
         if (!isInside) return;
 
         isInside = false;
         float duration = Time.time - enterTime;
 
-        int playerId = PhotonNetwork.LocalPlayer.ActorNumber;
-        MatchAnalytics.Instance.ZoneExit(playerId, zoneId, duration);
+        MatchAnalytics.Instance.ZoneExit(
+            pv.Owner.ActorNumber,
+            zoneId,
+            duration
+        );
     }
 }
