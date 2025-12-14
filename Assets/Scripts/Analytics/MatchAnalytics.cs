@@ -1,5 +1,5 @@
 using UnityEngine;
-using UnityEngine.Analytics;
+using Unity.Services.Analytics;
 using System.Collections.Generic;
 
 public class MatchAnalytics : MonoBehaviour
@@ -24,7 +24,7 @@ public class MatchAnalytics : MonoBehaviour
     {
         matchStartTime = Time.time;
 
-        Analytics.CustomEvent("match_start", new Dictionary<string, object>
+        AnalyticsService.Instance.CustomData("match_start", new Dictionary<string, object>
         {
             { "player_count", playerCount },
             { "lobby_time", lobbyTime }
@@ -33,7 +33,7 @@ public class MatchAnalytics : MonoBehaviour
 
     public void MatchEnd()
     {
-        Analytics.CustomEvent("match_end", new Dictionary<string, object>
+        AnalyticsService.Instance.CustomData("match_end", new Dictionary<string, object>
         {
             { "match_duration", Time.time - matchStartTime }
         });
@@ -41,7 +41,7 @@ public class MatchAnalytics : MonoBehaviour
 
     public void CrownPickup(int actorNumber)
     {
-        Analytics.CustomEvent("crown_pickup", new Dictionary<string, object>
+        AnalyticsService.Instance.CustomData("crown_pickup", new Dictionary<string, object>
         {
             { "actor", actorNumber }
         });
@@ -49,7 +49,7 @@ public class MatchAnalytics : MonoBehaviour
 
     public void CrownLost(int actorNumber)
     {
-        Analytics.CustomEvent("crown_lost", new Dictionary<string, object>
+        AnalyticsService.Instance.CustomData("crown_lost", new Dictionary<string, object>
         {
             { "actor", actorNumber }
         });
@@ -57,7 +57,7 @@ public class MatchAnalytics : MonoBehaviour
 
     public void PlayerJump(int actor)
     {
-        Analytics.CustomEvent("player_jump", new Dictionary<string, object>
+        AnalyticsService.Instance.CustomData("player_jump", new Dictionary<string, object>
         {
             { "actor", actor }
         });
@@ -65,7 +65,7 @@ public class MatchAnalytics : MonoBehaviour
 
     public void PlayerStunned(int attacker, int victim)
     {
-        Analytics.CustomEvent("player_stunned", new Dictionary<string, object>
+        AnalyticsService.Instance.CustomData("player_stunned", new Dictionary<string, object>
         {
             { "attacker", attacker },
             { "victim", victim }
@@ -74,18 +74,18 @@ public class MatchAnalytics : MonoBehaviour
 
     public void PlayerBlocked(int attacker, int victim)
     {
-        Analytics.CustomEvent("player_blocked_hit", new Dictionary<string, object>
+        AnalyticsService.Instance.CustomData("player_blocked_hit", new Dictionary<string, object>
         {
             { "attacker", attacker },
             { "victim", victim }
         });
     }
-    
-// ================= ZONES =================
+
+    // ================= ZONES =================
 
     public void ZoneEnter(int actorNumber, string zoneName)
     {
-        Analytics.CustomEvent("zone_enter", new Dictionary<string, object>
+        AnalyticsService.Instance.CustomData("zone_enter", new Dictionary<string, object>
         {
             { "actor", actorNumber },
             { "zone", zoneName }
@@ -94,7 +94,7 @@ public class MatchAnalytics : MonoBehaviour
 
     public void ZoneExit(int actorNumber, string zoneName, float duration)
     {
-        Analytics.CustomEvent("zone_exit", new Dictionary<string, object>
+        AnalyticsService.Instance.CustomData("zone_exit", new Dictionary<string, object>
         {
             { "actor", actorNumber },
             { "zone", zoneName },
@@ -104,13 +104,11 @@ public class MatchAnalytics : MonoBehaviour
 
     public void ZoneCombat(string zoneName, int attackerActor, int targetActor)
     {
-        Analytics.CustomEvent("combat_zone_event", new Dictionary<string, object>
+        AnalyticsService.Instance.CustomData("combat_zone_event", new Dictionary<string, object>
         {
             { "zone", zoneName },
             { "attacker", attackerActor },
             { "target", targetActor }
         });
     }
-
-
 }
