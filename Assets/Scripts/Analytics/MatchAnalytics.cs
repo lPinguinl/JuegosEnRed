@@ -43,7 +43,7 @@ public class MatchAnalytics : MonoBehaviour
     {
         AnalyticsService.Instance.CustomData("crown_pickup", new Dictionary<string, object>
         {
-            { "actor", actorNumber }
+            { "Actor", actorNumber }
         });
     }
 
@@ -51,7 +51,7 @@ public class MatchAnalytics : MonoBehaviour
     {
         AnalyticsService.Instance.CustomData("crown_lost", new Dictionary<string, object>
         {
-            { "actor", actorNumber }
+            { "Actor", actorNumber }
         });
     }
 
@@ -59,7 +59,7 @@ public class MatchAnalytics : MonoBehaviour
     {
         AnalyticsService.Instance.CustomData("player_jump", new Dictionary<string, object>
         {
-            { "actor", actor }
+            { "Actor", actor }
         });
     }
 
@@ -87,7 +87,7 @@ public class MatchAnalytics : MonoBehaviour
     {
         AnalyticsService.Instance.CustomData("zone_enter", new Dictionary<string, object>
         {
-            { "actor", actorNumber },
+            { "Actor", actorNumber },
             { "zone", zoneName }
         });
     }
@@ -96,9 +96,9 @@ public class MatchAnalytics : MonoBehaviour
     {
         AnalyticsService.Instance.CustomData("zone_exit", new Dictionary<string, object>
         {
-            { "actor", actorNumber },
+            { "Actor", actorNumber },
             { "zone", zoneName },
-            { "duration", duration }
+            { "Duration", duration }
         });
     }
 
